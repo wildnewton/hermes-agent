@@ -1,0 +1,88 @@
+name: Port native Codex delegation progress
+
+on:
+  push:
+    branches:
+      - fix/delegate-codex-app-server-progress
+
+permissions:
+  contents: write
+
+jobs:
+  port-and-test:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: fix/delegate-codex-app-server-progress
+          fetch-depth: 0
+
+      - name: Route delegated Codex through app-server and relay text deltas
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          delegate = Path('tools/delegate_tool.py')
+          text = delegate.read_text(encoding='utf-8')
+          old = '''    if override_acp_command:\n        # If explicitly forcing an ACP transport override, the provider MUST be copilot-acp\n        # so run_agent.py initializes the CopilotACPClient.\n        effective_provider = "copilot-acp"\n        effective_api_mode = "chat_completions"\n'''
+          new = '''    # Codex now has a native app-server transport that streams structured\n    # item notifications over stdio. Route an operator-configured `command: codex`\n    # through that runtime instead of the generic ACP compatibility client, which\n    # buffers agent-message chunks until the request completes. Other ACP commands\n    # retain the existing CopilotACPClient path unchanged.\n    codex_app_server_override = (\n        bool(override_acp_command)\n        and os.path.basename(str(override_acp_command)).lower() == "codex"\n    )\n    if codex_app_server_override:\n        effective_provider = "openai-codex"\n        effective_base_url = None\n        effective_api_key = None\n        effective_api_mode = "codex_app_server"\n        effective_acp_command = None\n        effective_acp_args = []\n    elif override_acp_command:\n        # If explicitly forcing a generic ACP transport override, the provider\n        # MUST be copilot-acp so run_agent.py initializes CopilotACPClient.\n        effective_provider = "copilot-acp"\n        effective_api_mode = "chat_completions"\n'''
+          if old not in text:
+              raise SystemExit('Expected ACP routing block was not found')
+          text = text.replace(old, new, 1)
+
+          old_pool = '''    child_pool = _resolve_child_credential_pool(\n        effective_provider, parent_agent, effective_base_url\n    )\n    if child_pool is not None:\n        child._credential_pool = child_pool\n'''
+          new_pool = '''    # The codex app-server subprocess owns its own authenticated session.\n    # Attaching a Hermes credential pool would let _run_single_child() swap the\n    # child back to codex_responses/chat_completions immediately before execution,\n    # defeating the explicit app-server routing.\n    child_pool = None\n    if effective_api_mode != "codex_app_server":\n        child_pool = _resolve_child_credential_pool(\n            effective_provider, parent_agent, effective_base_url\n        )\n    if child_pool is not None:\n        child._credential_pool = child_pool\n'''
+          if old_pool not in text:
+              raise SystemExit('Expected child credential-pool block was not found')
+          text = text.replace(old_pool, new_pool, 1)
+          delegate.write_text(text, encoding='utf-8')
+
+          runtime = Path('agent/codex_runtime.py')
+          rt = runtime.read_text(encoding='utf-8')
+          anchor = '''def _coerce_usage_int(value: Any) -> int:\n'''
+          helper = '''def _codex_note_to_text_delta(note: dict) -> str | None:\n    """Extract a streamed assistant-text delta from a Codex app-server note."""\n    if not isinstance(note, dict) or note.get("method") != "item/agentMessage/delta":\n        return None\n    params = note.get("params") or {}\n    delta = params.get("delta") if isinstance(params, dict) else None\n    return delta if isinstance(delta, str) and delta else None\n\n\ndef _relay_codex_progress_event(agent, note: dict) -> None:\n    """Bridge native Codex app-server notifications into Hermes progress events.\n\n    Tool starts remain visible on every Codex app-server route. For delegated\n    children, streamed ``item/agentMessage/delta`` text is additionally relayed\n    as ``subagent.text`` so gateway watch windows see Codex speaking before the\n    subprocess finishes. Top-level Codex sessions are unchanged.\n    """\n    progress_callback = getattr(agent, "tool_progress_callback", None)\n    if progress_callback is None:\n        return\n\n    if getattr(agent, "platform", None) == "subagent":\n        delta = _codex_note_to_text_delta(note)\n        if delta:\n            try:\n                progress_callback("subagent.text", None, delta, None)\n            except Exception:\n                logger.debug("codex text-progress callback raised", exc_info=True)\n\n    mapped = _codex_note_to_tool_progress(note)\n    if mapped is None:\n        return\n    tool_name, preview, args = mapped\n    try:\n        progress_callback("tool.started", tool_name, preview, args)\n    except Exception:\n        logger.debug("codex tool-progress callback raised", exc_info=True)\n\n\n'''
+          if anchor not in rt:
+              raise SystemExit('Expected codex runtime insertion anchor was not found')
+          rt = rt.replace(anchor, helper + anchor, 1)
+
+          old_callback = '''        def _on_codex_event(note: dict) -> None:\n            # Bridge Codex app-server item/started notifications to Hermes\n            # tool-progress so gateways show verbose "running X" breadcrumbs\n            # on this route too (#38835).\n            progress_callback = getattr(agent, "tool_progress_callback", None)\n            if progress_callback is None:\n                return\n            mapped = _codex_note_to_tool_progress(note)\n            if mapped is None:\n                return\n            tool_name, preview, args = mapped\n            try:\n                progress_callback("tool.started", tool_name, preview, args)\n            except Exception:\n                logger.debug("codex tool-progress callback raised", exc_info=True)\n'''
+          new_callback = '''        def _on_codex_event(note: dict) -> None:\n            _relay_codex_progress_event(agent, note)\n'''
+          if old_callback not in rt:
+              raise SystemExit('Expected codex on_event bridge was not found')
+          rt = rt.replace(old_callback, new_callback, 1)
+          runtime.write_text(rt, encoding='utf-8')
+
+          tests = Path('tests/tools/test_delegate.py')
+          test_text = tests.read_text(encoding='utf-8')
+          marker = 'class TestCodexAppServerDelegation(unittest.TestCase):'
+          if marker not in test_text:
+              test_text += '''\n\nclass TestCodexAppServerDelegation(unittest.TestCase):\n    def test_codex_command_routes_to_native_app_server(self):\n        parent = _make_mock_parent()\n        with patch("tools.delegate_tool._load_config", return_value={}), \\\n             patch("shutil.which", return_value="/usr/local/bin/codex"), \\\n             patch("tools.delegate_tool._resolve_child_credential_pool") as mock_pool, \\\n             patch("run_agent.AIAgent") as MockAgent:\n            MockAgent.return_value = MagicMock()\n            _build_child_agent(\n                task_index=0,\n                goal="Use Codex",\n                context=None,\n                toolsets=["terminal"],\n                model="gpt-5-codex",\n                max_iterations=10,\n                parent_agent=parent,\n                task_count=1,\n                override_provider="copilot-acp",\n                override_base_url="acp://codex",\n                override_api_key="copilot-acp",\n                override_api_mode="chat_completions",\n                override_acp_command="codex",\n                override_acp_args=["--acp", "--stdio"],\n            )\n\n        kwargs = MockAgent.call_args.kwargs\n        self.assertEqual(kwargs["provider"], "openai-codex")\n        self.assertEqual(kwargs["api_mode"], "codex_app_server")\n        self.assertIsNone(kwargs["base_url"])\n        self.assertIsNone(kwargs["api_key"])\n        self.assertIsNone(kwargs["acp_command"])\n        self.assertEqual(kwargs["acp_args"], [])\n        mock_pool.assert_not_called()\n\n    def test_non_codex_acp_command_keeps_compatibility_path(self):\n        parent = _make_mock_parent()\n        with patch("tools.delegate_tool._load_config", return_value={}), \\\n             patch("shutil.which", return_value="/usr/local/bin/custom-copilot"), \\\n             patch("tools.delegate_tool._resolve_child_credential_pool", return_value=None), \\\n             patch("run_agent.AIAgent") as MockAgent:\n            MockAgent.return_value = MagicMock()\n            _build_child_agent(\n                task_index=0,\n                goal="Use generic ACP",\n                context=None,\n                toolsets=["terminal"],\n                model="copilot-model",\n                max_iterations=10,\n                parent_agent=parent,\n                task_count=1,\n                override_acp_command="custom-copilot",\n                override_acp_args=["--stdio-custom"],\n            )\n\n        kwargs = MockAgent.call_args.kwargs\n        self.assertEqual(kwargs["provider"], "copilot-acp")\n        self.assertEqual(kwargs["api_mode"], "chat_completions")\n        self.assertEqual(kwargs["acp_command"], "custom-copilot")\n        self.assertEqual(kwargs["acp_args"], ["--stdio-custom"])\n\n    def test_native_codex_agent_message_delta_reaches_subagent_progress(self):\n        from agent.codex_runtime import _relay_codex_progress_event\n\n        events = []\n        child = MagicMock()\n        child.platform = "subagent"\n        child.tool_progress_callback = lambda *args, **kwargs: events.append((args, kwargs))\n\n        _relay_codex_progress_event(\n            child,\n            {\n                "method": "item/agentMessage/delta",\n                "params": {"itemId": "msg-1", "delta": "Interim Codex text"},\n            },\n        )\n\n        self.assertEqual(\n            events,\n            [(("subagent.text", None, "Interim Codex text", None), {})],\n        )\n\n    def test_native_codex_command_start_still_reaches_tool_progress(self):\n        from agent.codex_runtime import _relay_codex_progress_event\n\n        events = []\n        child = MagicMock()\n        child.platform = "subagent"\n        child.tool_progress_callback = lambda *args, **kwargs: events.append((args, kwargs))\n\n        _relay_codex_progress_event(\n            child,\n            {\n                "method": "item/started",\n                "params": {\n                    "item": {\n                        "type": "commandExecution",\n                        "command": "pytest -q",\n                        "cwd": "/tmp/repo",\n                    }\n                },\n            },\n        )\n\n        self.assertEqual(events[0][0][0], "tool.started")\n        self.assertEqual(events[0][0][1], "exec_command")\n        self.assertIn("pytest", events[0][0][2])\n'''
+              tests.write_text(test_text, encoding='utf-8')
+          PY
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # 8.2.0
+
+      - name: Set up Python 3.11
+        run: uv python install 3.11
+
+      - name: Install dependencies
+        run: uv sync --locked --python 3.11 --extra dev
+
+      - name: Run focused Codex delegation tests
+        run: uv run pytest -q tests/tools/test_delegate.py -k 'CodexAppServerDelegation or delegation_acp_runtime_reaches_child_agent'
+
+      - name: Compile changed Python modules
+        run: uv run python -m py_compile tools/delegate_tool.py agent/codex_runtime.py tests/tools/test_delegate.py
+
+      - name: Commit tested port and remove one-shot workflow
+        run: |
+          rm .github/workflows/port-codex-app-server-progress.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add tools/delegate_tool.py agent/codex_runtime.py tests/tools/test_delegate.py .github/workflows/port-codex-app-server-progress.yml
+          git commit -m 'fix(delegation): stream native Codex app-server progress'
+          git push origin HEAD:fix/delegate-codex-app-server-progress
