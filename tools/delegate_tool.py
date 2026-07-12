@@ -1250,7 +1250,7 @@ def _build_child_agent(
     # retain the existing CopilotACPClient path unchanged.
     codex_app_server_override = (
         bool(override_acp_command)
-        and os.path.basename(str(override_acp_command)).lower() == "codex"
+        and os.path.splitext(os.path.basename(str(override_acp_command)))[0].lower() == "codex"
     )
     if codex_app_server_override:
         effective_provider = "openai-codex"

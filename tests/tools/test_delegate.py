@@ -3097,10 +3097,6 @@ class TestFallbackModelInheritance(unittest.TestCase):
         self.assertIsNone(kwargs["fallback_model"])
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class TestCodexAppServerDelegation(unittest.TestCase):
     def test_codex_command_routes_to_native_app_server(self):
         parent = _make_mock_parent()
@@ -3133,6 +3129,31 @@ class TestCodexAppServerDelegation(unittest.TestCase):
         self.assertIsNone(kwargs["api_key"])
         self.assertIsNone(kwargs["acp_command"])
         self.assertEqual(kwargs["acp_args"], [])
+        mock_pool.assert_not_called()
+
+    def test_codex_exe_command_routes_to_native_app_server(self):
+        parent = _make_mock_parent()
+        with patch("tools.delegate_tool._load_config", return_value={}), \
+             patch("shutil.which", return_value="C:/bin/codex.exe"), \
+             patch("tools.delegate_tool._resolve_child_credential_pool") as mock_pool, \
+             patch("run_agent.AIAgent") as MockAgent:
+            MockAgent.return_value = MagicMock()
+            _build_child_agent(
+                task_index=0,
+                goal="Use Codex on Windows",
+                context=None,
+                toolsets=["terminal"],
+                model="gpt-5-codex",
+                max_iterations=10,
+                parent_agent=parent,
+                task_count=1,
+                override_acp_command="codex.exe",
+                override_acp_args=[],
+            )
+
+        kwargs = MockAgent.call_args.kwargs
+        self.assertEqual(kwargs["api_mode"], "codex_app_server")
+        self.assertIsNone(kwargs["acp_command"])
         mock_pool.assert_not_called()
 
     def test_non_codex_acp_command_keeps_compatibility_path(self):
@@ -3207,3 +3228,6 @@ class TestCodexAppServerDelegation(unittest.TestCase):
         self.assertEqual(events[0][0][0], "tool.started")
         self.assertEqual(events[0][0][1], "exec_command")
         self.assertIn("pytest", events[0][0][2])
+
+if __name__ == "__main__":
+    unittest.main()
