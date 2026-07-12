@@ -1,0 +1,96 @@
+name: Prepare Codex merge branch
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+concurrency:
+  group: prepare-codex-merge
+  cancel-in-progress: true
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out target branch
+        uses: actions/checkout@v4
+        with:
+          ref: merge/codex-delegate-progress-and-symlinks
+          fetch-depth: 1
+          show-progress: false
+
+      - name: Cherry-pick source branch commits
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch --quiet --no-tags --depth=3000 origin \
+            +refs/heads/main:refs/remotes/origin/main \
+            +refs/heads/fix/find-skill-follow-symlinks:refs/remotes/origin/fix/find-skill-follow-symlinks
+          base="$(git merge-base origin/main origin/fix/find-skill-follow-symlinks)"
+          commits="$(git rev-list --reverse "${base}"..origin/fix/find-skill-follow-symlinks)"
+          for commit in ${commits}; do
+            if git cherry-pick "${commit}"; then
+              continue
+            fi
+
+            if [[ "${commit}" == "0840c1bdf3bb5690623ff13570487fe6924614c0" ]]; then
+              file="tests/tools/test_skill_manager_tool.py"
+              git checkout --ours -- "${file}"
+              printf '\n\n' >> "${file}"
+              git show "${commit}:${file}" | sed -n '/^class TestFindSkillFollowsSymlinks:/,$p' >> "${file}"
+              git add "${file}"
+              git cherry-pick --continue
+              continue
+            fi
+
+            if git diff --name-only --diff-filter=U | grep -q .; then
+              {
+                echo "CONFLICT_COMMIT=${commit}"
+                echo
+                echo "SOURCE COMMITS"
+                git log --reverse --oneline "${base}"..origin/fix/find-skill-follow-symlinks
+                echo
+                echo "STATUS"
+                git status --short
+                echo
+                echo "CONFLICTED FILES"
+                git diff --name-only --diff-filter=U
+                echo
+                echo "CONFLICT DIFF"
+                git diff --cc --unified=30 || true
+              } > .merge-conflict-report.txt
+              git cherry-pick --abort
+              rm .github/workflows/prepare-codex-merge.yml
+              git add -A
+              git commit -m "chore: record Codex merge conflict [conflict-report]"
+              git push origin HEAD:merge/codex-delegate-progress-and-symlinks
+              exit 1
+            fi
+            git cherry-pick --skip
+          done
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install test dependencies
+        run: python -m pip install -e '.[dev]'
+
+      - name: Run focused tests
+        run: python -m pytest tests/tools/test_delegate.py tests/tools/test_skill_manager_tool.py
+
+      - name: Remove temporary workflow and push
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/prepare-codex-merge.yml
+          git add -A
+          git commit -m "chore: finish Codex merge preparation [prepared]"
+          git push origin HEAD:merge/codex-delegate-progress-and-symlinks
