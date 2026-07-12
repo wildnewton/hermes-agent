@@ -1,0 +1,78 @@
+name: Harden native Codex delegation progress
+
+on:
+  push:
+    branches:
+      - fix/delegate-codex-app-server-progress
+
+permissions:
+  contents: write
+
+jobs:
+  harden-and-test:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: fix/delegate-codex-app-server-progress
+          fetch-depth: 0
+
+      - name: Harden command detection and test placement
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          delegate = Path('tools/delegate_tool.py')
+          text = delegate.read_text(encoding='utf-8')
+          old = 'and os.path.basename(str(override_acp_command)).lower() == "codex"'
+          new = (
+              'and os.path.splitext(os.path.basename(str(override_acp_command)))[0].lower() '
+              '== "codex"'
+          )
+          if old not in text:
+              raise SystemExit('Expected Codex command detection was not found')
+          delegate.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          tests = Path('tests/tools/test_delegate.py')
+          test_text = tests.read_text(encoding='utf-8')
+          main_block = '\n\nif __name__ == "__main__":\n    unittest.main()\n'
+          if test_text.count(main_block) != 1:
+              raise SystemExit('Expected exactly one unittest main block')
+          test_text = test_text.replace(main_block, '', 1)
+          test_text = test_text.rstrip() + main_block
+
+          anchor = '    def test_non_codex_acp_command_keeps_compatibility_path(self):\n'
+          windows_test = '''    def test_codex_exe_command_routes_to_native_app_server(self):\n        parent = _make_mock_parent()\n        with patch("tools.delegate_tool._load_config", return_value={}), \\\n             patch("shutil.which", return_value="C:/bin/codex.exe"), \\\n             patch("tools.delegate_tool._resolve_child_credential_pool") as mock_pool, \\\n             patch("run_agent.AIAgent") as MockAgent:\n            MockAgent.return_value = MagicMock()\n            _build_child_agent(\n                task_index=0,\n                goal="Use Codex on Windows",\n                context=None,\n                toolsets=["terminal"],\n                model="gpt-5-codex",\n                max_iterations=10,\n                parent_agent=parent,\n                task_count=1,\n                override_acp_command="codex.exe",\n                override_acp_args=[],\n            )\n\n        kwargs = MockAgent.call_args.kwargs\n        self.assertEqual(kwargs["api_mode"], "codex_app_server")\n        self.assertIsNone(kwargs["acp_command"])\n        mock_pool.assert_not_called()\n\n'''
+          if windows_test not in test_text:
+              if anchor not in test_text:
+                  raise SystemExit('Expected test insertion anchor was not found')
+              test_text = test_text.replace(anchor, windows_test + anchor, 1)
+          tests.write_text(test_text, encoding='utf-8')
+          PY
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # 8.2.0
+
+      - name: Set up Python 3.11
+        run: uv python install 3.11
+
+      - name: Install dependencies
+        run: uv sync --locked --python 3.11 --extra dev
+
+      - name: Run full delegate test file
+        run: uv run pytest -q tests/tools/test_delegate.py
+
+      - name: Compile changed Python modules
+        run: uv run python -m py_compile tools/delegate_tool.py agent/codex_runtime.py tests/tools/test_delegate.py
+
+      - name: Commit hardened port and remove one-shot workflow
+        run: |
+          rm .github/workflows/harden-codex-progress-port.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add tools/delegate_tool.py tests/tools/test_delegate.py .github/workflows/harden-codex-progress-port.yml
+          git commit -m 'test(delegation): harden native Codex progress routing'
+          git push origin HEAD:fix/delegate-codex-app-server-progress
