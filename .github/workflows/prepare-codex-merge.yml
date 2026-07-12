@@ -4,18 +4,22 @@ on:
   push:
     branches:
       - merge/codex-delegate-progress-and-symlinks
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
 
 jobs:
   prepare:
-    if: ${{ !contains(github.event.head_commit.message, '[prepared]') }}
+    if: ${{ github.event_name == 'pull_request' || !contains(github.event.head_commit.message, '[prepared]') }}
     runs-on: ubuntu-latest
     steps:
       - name: Check out target branch
         uses: actions/checkout@v4
         with:
+          ref: merge/codex-delegate-progress-and-symlinks
           fetch-depth: 0
 
       - name: Cherry-pick source branch commits
