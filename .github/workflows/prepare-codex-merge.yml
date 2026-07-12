@@ -34,19 +34,31 @@ jobs:
             +refs/heads/fix/find-skill-follow-symlinks:refs/remotes/origin/fix/find-skill-follow-symlinks
           base="$(git merge-base origin/main origin/fix/find-skill-follow-symlinks)"
           commits="$(git rev-list --reverse "${base}"..origin/fix/find-skill-follow-symlinks)"
-          echo "Source commits:"
-          git log --reverse --oneline "${base}"..origin/fix/find-skill-follow-symlinks
           for commit in ${commits}; do
-            echo "Cherry-picking ${commit}"
             if git cherry-pick "${commit}"; then
               continue
             fi
             if git diff --name-only --diff-filter=U | grep -q .; then
-              echo "::error::Cherry-pick conflict in ${commit}"
-              echo "Conflicted files:"
-              git diff --name-only --diff-filter=U
-              echo "Conflict diff:"
-              git diff --cc --unified=8 || true
+              {
+                echo "CONFLICT_COMMIT=${commit}"
+                echo
+                echo "SOURCE COMMITS"
+                git log --reverse --oneline "${base}"..origin/fix/find-skill-follow-symlinks
+                echo
+                echo "STATUS"
+                git status --short
+                echo
+                echo "CONFLICTED FILES"
+                git diff --name-only --diff-filter=U
+                echo
+                echo "CONFLICT DIFF"
+                git diff --cc --unified=30 || true
+              } > .merge-conflict-report.txt
+              git cherry-pick --abort
+              rm .github/workflows/prepare-codex-merge.yml
+              git add -A
+              git commit -m "chore: record Codex merge conflict [conflict-report]"
+              git push origin HEAD:merge/codex-delegate-progress-and-symlinks
               exit 1
             fi
             git cherry-pick --skip
