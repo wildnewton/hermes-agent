@@ -3099,3 +3099,111 @@ class TestFallbackModelInheritance(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestCodexAppServerDelegation(unittest.TestCase):
+    def test_codex_command_routes_to_native_app_server(self):
+        parent = _make_mock_parent()
+        with patch("tools.delegate_tool._load_config", return_value={}), \
+             patch("shutil.which", return_value="/usr/local/bin/codex"), \
+             patch("tools.delegate_tool._resolve_child_credential_pool") as mock_pool, \
+             patch("run_agent.AIAgent") as MockAgent:
+            MockAgent.return_value = MagicMock()
+            _build_child_agent(
+                task_index=0,
+                goal="Use Codex",
+                context=None,
+                toolsets=["terminal"],
+                model="gpt-5-codex",
+                max_iterations=10,
+                parent_agent=parent,
+                task_count=1,
+                override_provider="copilot-acp",
+                override_base_url="acp://codex",
+                override_api_key="copilot-acp",
+                override_api_mode="chat_completions",
+                override_acp_command="codex",
+                override_acp_args=["--acp", "--stdio"],
+            )
+
+        kwargs = MockAgent.call_args.kwargs
+        self.assertEqual(kwargs["provider"], "openai-codex")
+        self.assertEqual(kwargs["api_mode"], "codex_app_server")
+        self.assertIsNone(kwargs["base_url"])
+        self.assertIsNone(kwargs["api_key"])
+        self.assertIsNone(kwargs["acp_command"])
+        self.assertEqual(kwargs["acp_args"], [])
+        mock_pool.assert_not_called()
+
+    def test_non_codex_acp_command_keeps_compatibility_path(self):
+        parent = _make_mock_parent()
+        with patch("tools.delegate_tool._load_config", return_value={}), \
+             patch("shutil.which", return_value="/usr/local/bin/custom-copilot"), \
+             patch("tools.delegate_tool._resolve_child_credential_pool", return_value=None), \
+             patch("run_agent.AIAgent") as MockAgent:
+            MockAgent.return_value = MagicMock()
+            _build_child_agent(
+                task_index=0,
+                goal="Use generic ACP",
+                context=None,
+                toolsets=["terminal"],
+                model="copilot-model",
+                max_iterations=10,
+                parent_agent=parent,
+                task_count=1,
+                override_acp_command="custom-copilot",
+                override_acp_args=["--stdio-custom"],
+            )
+
+        kwargs = MockAgent.call_args.kwargs
+        self.assertEqual(kwargs["provider"], "copilot-acp")
+        self.assertEqual(kwargs["api_mode"], "chat_completions")
+        self.assertEqual(kwargs["acp_command"], "custom-copilot")
+        self.assertEqual(kwargs["acp_args"], ["--stdio-custom"])
+
+    def test_native_codex_agent_message_delta_reaches_subagent_progress(self):
+        from agent.codex_runtime import _relay_codex_progress_event
+
+        events = []
+        child = MagicMock()
+        child.platform = "subagent"
+        child.tool_progress_callback = lambda *args, **kwargs: events.append((args, kwargs))
+
+        _relay_codex_progress_event(
+            child,
+            {
+                "method": "item/agentMessage/delta",
+                "params": {"itemId": "msg-1", "delta": "Interim Codex text"},
+            },
+        )
+
+        self.assertEqual(
+            events,
+            [(("subagent.text", None, "Interim Codex text", None), {})],
+        )
+
+    def test_native_codex_command_start_still_reaches_tool_progress(self):
+        from agent.codex_runtime import _relay_codex_progress_event
+
+        events = []
+        child = MagicMock()
+        child.platform = "subagent"
+        child.tool_progress_callback = lambda *args, **kwargs: events.append((args, kwargs))
+
+        _relay_codex_progress_event(
+            child,
+            {
+                "method": "item/started",
+                "params": {
+                    "item": {
+                        "type": "commandExecution",
+                        "command": "pytest -q",
+                        "cwd": "/tmp/repo",
+                    }
+                },
+            },
+        )
+
+        self.assertEqual(events[0][0][0], "tool.started")
+        self.assertEqual(events[0][0][1], "exec_command")
+        self.assertIn("pytest", events[0][0][2])

@@ -1243,9 +1243,25 @@ def _build_child_agent(
         effective_acp_command = None
         effective_acp_args = []
 
-    if override_acp_command:
-        # If explicitly forcing an ACP transport override, the provider MUST be copilot-acp
-        # so run_agent.py initializes the CopilotACPClient.
+    # Codex now has a native app-server transport that streams structured
+    # item notifications over stdio. Route an operator-configured `command: codex`
+    # through that runtime instead of the generic ACP compatibility client, which
+    # buffers agent-message chunks until the request completes. Other ACP commands
+    # retain the existing CopilotACPClient path unchanged.
+    codex_app_server_override = (
+        bool(override_acp_command)
+        and os.path.basename(str(override_acp_command)).lower() == "codex"
+    )
+    if codex_app_server_override:
+        effective_provider = "openai-codex"
+        effective_base_url = None
+        effective_api_key = None
+        effective_api_mode = "codex_app_server"
+        effective_acp_command = None
+        effective_acp_args = []
+    elif override_acp_command:
+        # If explicitly forcing a generic ACP transport override, the provider
+        # MUST be copilot-acp so run_agent.py initializes CopilotACPClient.
         effective_provider = "copilot-acp"
         effective_api_mode = "chat_completions"
 
@@ -1355,9 +1371,15 @@ def _build_child_agent(
 
     # Share a credential pool with the child when possible so subagents can
     # rotate credentials on rate limits instead of getting pinned to one key.
-    child_pool = _resolve_child_credential_pool(
-        effective_provider, parent_agent, effective_base_url
-    )
+    # The codex app-server subprocess owns its own authenticated session.
+    # Attaching a Hermes credential pool would let _run_single_child() swap the
+    # child back to codex_responses/chat_completions immediately before execution,
+    # defeating the explicit app-server routing.
+    child_pool = None
+    if effective_api_mode != "codex_app_server":
+        child_pool = _resolve_child_credential_pool(
+            effective_provider, parent_agent, effective_base_url
+        )
     if child_pool is not None:
         child._credential_pool = child_pool
 

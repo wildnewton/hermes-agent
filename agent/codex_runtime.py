@@ -80,6 +80,45 @@ def _codex_note_to_tool_progress(note: dict) -> tuple[str, str, dict] | None:
     return None
 
 
+def _codex_note_to_text_delta(note: dict) -> str | None:
+    """Extract a streamed assistant-text delta from a Codex app-server note."""
+    if not isinstance(note, dict) or note.get("method") != "item/agentMessage/delta":
+        return None
+    params = note.get("params") or {}
+    delta = params.get("delta") if isinstance(params, dict) else None
+    return delta if isinstance(delta, str) and delta else None
+
+
+def _relay_codex_progress_event(agent, note: dict) -> None:
+    """Bridge native Codex app-server notifications into Hermes progress events.
+
+    Tool starts remain visible on every Codex app-server route. For delegated
+    children, streamed ``item/agentMessage/delta`` text is additionally relayed
+    as ``subagent.text`` so gateway watch windows see Codex speaking before the
+    subprocess finishes. Top-level Codex sessions are unchanged.
+    """
+    progress_callback = getattr(agent, "tool_progress_callback", None)
+    if progress_callback is None:
+        return
+
+    if getattr(agent, "platform", None) == "subagent":
+        delta = _codex_note_to_text_delta(note)
+        if delta:
+            try:
+                progress_callback("subagent.text", None, delta, None)
+            except Exception:
+                logger.debug("codex text-progress callback raised", exc_info=True)
+
+    mapped = _codex_note_to_tool_progress(note)
+    if mapped is None:
+        return
+    tool_name, preview, args = mapped
+    try:
+        progress_callback("tool.started", tool_name, preview, args)
+    except Exception:
+        logger.debug("codex tool-progress callback raised", exc_info=True)
+
+
 def _coerce_usage_int(value: Any) -> int:
     if isinstance(value, bool):
         return 0
@@ -357,20 +396,7 @@ def run_codex_app_server_turn(
             )
 
         def _on_codex_event(note: dict) -> None:
-            # Bridge Codex app-server item/started notifications to Hermes
-            # tool-progress so gateways show verbose "running X" breadcrumbs
-            # on this route too (#38835).
-            progress_callback = getattr(agent, "tool_progress_callback", None)
-            if progress_callback is None:
-                return
-            mapped = _codex_note_to_tool_progress(note)
-            if mapped is None:
-                return
-            tool_name, preview, args = mapped
-            try:
-                progress_callback("tool.started", tool_name, preview, args)
-            except Exception:
-                logger.debug("codex tool-progress callback raised", exc_info=True)
+            _relay_codex_progress_event(agent, note)
 
         agent._codex_session = CodexAppServerSession(
             cwd=cwd,
