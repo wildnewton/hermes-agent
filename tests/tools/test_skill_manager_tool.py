@@ -1382,3 +1382,30 @@ class TestCuratorConsolidationDeleteGuard:
             assert allowed["success"] is True, allowed
 
         _reset_background_review_read_marks()
+
+
+class TestFindSkillFollowsSymlinks:
+    """_find_skill must follow symlinks, matching skill_view discovery."""
+
+    def test_finds_skill_via_symlinked_directory(self, tmp_path):
+        from tools.skill_manager_tool import _find_skill
+
+        skills = tmp_path / "local-skills"
+        skills.mkdir()
+        real_dir = tmp_path / "real-skill"
+        real_dir.mkdir()
+        (real_dir / "SKILL.md").write_text(
+            "---\nname: test-symlink\ndescription: test\n---\n# Test\n",
+            encoding="utf-8",
+        )
+        symlink = skills / "test-symlink"
+        symlink.symlink_to(real_dir, target_is_directory=True)
+
+        with patch(
+            "agent.skill_utils.get_all_skills_dirs",
+            return_value=[skills],
+        ):
+            found = _find_skill("test-symlink")
+
+        assert found is not None
+        assert found["path"] == symlink
