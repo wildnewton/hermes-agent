@@ -3134,7 +3134,7 @@ class TestCodexExecDelegation(unittest.TestCase):
         """item.started command_execution → child_progress_cb receives message."""
         child = self._make_codex_child()
         progress_calls = []
-        child.tool_progress_callback = lambda et, tn=None, pv=None, **kw: progress_calls.append((et, pv))
+        child.tool_progress_callback = lambda et, tn=None, pv=None, *a, **kw: progress_calls.append((et, pv, kw))
         child._delegate_saved_tool_names = []
         child._credential_pool = None
 
@@ -3166,7 +3166,7 @@ class TestCodexExecDelegation(unittest.TestCase):
         _run_codex_exec("test goal", child.tool_progress_callback, child, 0, time.monotonic())
 
         # Check command-start was relayed
-        command_starts = [pv for et, pv in progress_calls if et == "subagent.text" and "Codex is running" in (pv or "")]
+        command_starts = [kw.get("preview") for et, pv, kw in progress_calls if et == "subagent.text" and "Codex is running" in (kw.get("preview") or "")]
         self.assertTrue(len(command_starts) > 0, "command_start should relay progress")
         self.assertIn("pytest", command_starts[0])
 
@@ -3178,7 +3178,7 @@ class TestCodexExecDelegation(unittest.TestCase):
         """item.completed command_execution status=completed → success message."""
         child = self._make_codex_child()
         progress_calls = []
-        child.tool_progress_callback = lambda et, tn=None, pv=None, **kw: progress_calls.append((et, pv))
+        child.tool_progress_callback = lambda et, tn=None, pv=None, *a, **kw: progress_calls.append((et, pv, kw))
         child._delegate_saved_tool_names = []
         child._credential_pool = None
 
@@ -3204,7 +3204,7 @@ class TestCodexExecDelegation(unittest.TestCase):
         from tools.delegate_tool import _run_codex_exec
         _run_codex_exec("test", child.tool_progress_callback, child, 0, time.monotonic())
 
-        completes = [pv for et, pv in progress_calls if et == "subagent.text" and "completed" in (pv or "").lower()]
+        completes = [kw.get("preview") for et, pv, kw in progress_calls if et == "subagent.text" and "completed" in (kw.get("preview") or "").lower()]
         self.assertTrue(len(completes) > 0, "command success should relay completed message")
 
     @patch("subprocess.Popen")
@@ -3212,7 +3212,7 @@ class TestCodexExecDelegation(unittest.TestCase):
         """item.completed command_execution status=failed → failure message with exit code."""
         child = self._make_codex_child()
         progress_calls = []
-        child.tool_progress_callback = lambda et, tn=None, pv=None, **kw: progress_calls.append((et, pv))
+        child.tool_progress_callback = lambda et, tn=None, pv=None, *a, **kw: progress_calls.append((et, pv, kw))
         child._delegate_saved_tool_names = []
         child._credential_pool = None
 
@@ -3238,7 +3238,7 @@ class TestCodexExecDelegation(unittest.TestCase):
         from tools.delegate_tool import _run_codex_exec
         result = _run_codex_exec("test", child.tool_progress_callback, child, 0, time.monotonic())
 
-        failures = [pv for et, pv in progress_calls if et == "subagent.text" and "failed" in (pv or "").lower()]
+        failures = [kw.get("preview") for et, pv, kw in progress_calls if et == "subagent.text" and "failed" in (kw.get("preview") or "").lower()]
         self.assertTrue(len(failures) > 0, "command failure should relay failed message")
         self.assertIn("exit 1", failures[0].lower())
 
@@ -3250,7 +3250,7 @@ class TestCodexExecDelegation(unittest.TestCase):
         """item.completed file_change → concise list of changed files."""
         child = self._make_codex_child()
         progress_calls = []
-        child.tool_progress_callback = lambda et, tn=None, pv=None, **kw: progress_calls.append((et, pv))
+        child.tool_progress_callback = lambda et, tn=None, pv=None, *a, **kw: progress_calls.append((et, pv, kw))
         child._delegate_saved_tool_names = []
         child._credential_pool = None
 
@@ -3280,7 +3280,7 @@ class TestCodexExecDelegation(unittest.TestCase):
         from tools.delegate_tool import _run_codex_exec
         _run_codex_exec("test", child.tool_progress_callback, child, 0, time.monotonic())
 
-        file_msgs = [pv for et, pv in progress_calls if et == "subagent.text" and "Codex changed" in (pv or "")]
+        file_msgs = [kw.get("preview") for et, pv, kw in progress_calls if et == "subagent.text" and "Codex changed" in (kw.get("preview") or "")]
         self.assertTrue(len(file_msgs) > 0, "file_change should relay progress")
         self.assertIn("auth.py", file_msgs[0])
         self.assertIn("test_auth.py", file_msgs[0])
@@ -3293,7 +3293,7 @@ class TestCodexExecDelegation(unittest.TestCase):
         """agent_message → relayed + returned as final summary, not duplicated."""
         child = self._make_codex_child()
         progress_calls = []
-        child.tool_progress_callback = lambda et, tn=None, pv=None, **kw: progress_calls.append((et, pv))
+        child.tool_progress_callback = lambda et, tn=None, pv=None, *a, **kw: progress_calls.append((et, pv, kw))
         child._delegate_saved_tool_names = []
         child._credential_pool = None
 
@@ -3320,7 +3320,7 @@ class TestCodexExecDelegation(unittest.TestCase):
         result = _run_codex_exec("test", child.tool_progress_callback, child, 0, time.monotonic())
 
         # Both messages should be relayed
-        text_msgs = [pv for et, pv in progress_calls if et == "subagent.text" and pv]
+        text_msgs = [kw.get("preview") for et, pv, kw in progress_calls if et == "subagent.text" and kw.get("preview")]
         self.assertGreaterEqual(len(text_msgs), 2)
 
         # Final summary should be the LAST agent_message
@@ -3335,7 +3335,7 @@ class TestCodexExecDelegation(unittest.TestCase):
         """turn.failed event → failed delegation result with error message."""
         child = self._make_codex_child()
         progress_calls = []
-        child.tool_progress_callback = lambda et, tn=None, pv=None, **kw: progress_calls.append((et, pv))
+        child.tool_progress_callback = lambda et, tn=None, pv=None, *a, **kw: progress_calls.append((et, pv, kw))
         child._delegate_saved_tool_names = []
         child._credential_pool = None
 
@@ -3365,7 +3365,7 @@ class TestCodexExecDelegation(unittest.TestCase):
         """Top-level error event → failed delegation result."""
         child = self._make_codex_child()
         progress_calls = []
-        child.tool_progress_callback = lambda et, tn=None, pv=None, **kw: progress_calls.append((et, pv))
+        child.tool_progress_callback = lambda et, tn=None, pv=None, *a, **kw: progress_calls.append((et, pv, kw))
         child._delegate_saved_tool_names = []
         child._credential_pool = None
 
@@ -3393,7 +3393,7 @@ class TestCodexExecDelegation(unittest.TestCase):
         """Malformed lines and unknown events are skipped without crashing."""
         child = self._make_codex_child()
         progress_calls = []
-        child.tool_progress_callback = lambda et, tn=None, pv=None, **kw: progress_calls.append((et, pv))
+        child.tool_progress_callback = lambda et, tn=None, pv=None, *a, **kw: progress_calls.append((et, pv, kw))
         child._delegate_saved_tool_names = []
         child._credential_pool = None
 
