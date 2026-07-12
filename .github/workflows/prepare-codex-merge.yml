@@ -1,9 +1,6 @@
 name: Prepare Codex merge branch
 
 on:
-  push:
-    branches:
-      - merge/codex-delegate-progress-and-symlinks
   pull_request:
     branches:
       - main
@@ -11,16 +8,20 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: prepare-codex-merge
+  cancel-in-progress: true
+
 jobs:
   prepare:
-    if: ${{ github.event_name == 'pull_request' || !contains(github.event.head_commit.message, '[prepared]') }}
     runs-on: ubuntu-latest
     steps:
       - name: Check out target branch
         uses: actions/checkout@v4
         with:
           ref: merge/codex-delegate-progress-and-symlinks
-          fetch-depth: 0
+          fetch-depth: 1
+          show-progress: false
 
       - name: Cherry-pick source branch commits
         shell: bash
@@ -28,16 +29,24 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git fetch origin fix/find-skill-follow-symlinks
-          base="$(git merge-base HEAD origin/fix/find-skill-follow-symlinks)"
+          git fetch --quiet --no-tags --depth=3000 origin \
+            +refs/heads/main:refs/remotes/origin/main \
+            +refs/heads/fix/find-skill-follow-symlinks:refs/remotes/origin/fix/find-skill-follow-symlinks
+          base="$(git merge-base origin/main origin/fix/find-skill-follow-symlinks)"
           commits="$(git rev-list --reverse "${base}"..origin/fix/find-skill-follow-symlinks)"
+          echo "Source commits:"
+          git log --reverse --oneline "${base}"..origin/fix/find-skill-follow-symlinks
           for commit in ${commits}; do
+            echo "Cherry-picking ${commit}"
             if git cherry-pick "${commit}"; then
               continue
             fi
             if git diff --name-only --diff-filter=U | grep -q .; then
-              echo "Cherry-pick conflict in ${commit}"
-              git status --short
+              echo "::error::Cherry-pick conflict in ${commit}"
+              echo "Conflicted files:"
+              git diff --name-only --diff-filter=U
+              echo "Conflict diff:"
+              git diff --cc --unified=8 || true
               exit 1
             fi
             git cherry-pick --skip
