@@ -1,11 +1,2291 @@
 # Codex app-server / delegation inspection
 
-## All relevant matches
+## Matches for `CodexAppServerSession`
+### agent/codex_runtime.py:318
+```python
+  314:     Called from run_conversation() when agent.api_mode == "codex_app_server".
+  315:     Returns the same dict shape as the chat_completions path.
+  316:     """
+  317:     from agent.transports.codex_app_server_session import (
+  318:         CodexAppServerSession,
+  319:         _ServerRequestRouting,
+  320:     )
+  321: 
+  322:     # Lazy session: one CodexAppServerSession per AIAgent instance.
+```
+### agent/codex_runtime.py:322
+```python
+  318:         CodexAppServerSession,
+  319:         _ServerRequestRouting,
+  320:     )
+  321: 
+  322:     # Lazy session: one CodexAppServerSession per AIAgent instance.
+  323:     # Spawned on first turn, reused across turns, closed at AIAgent
+  324:     # shutdown (see _cleanup hook).
+  325:     if not hasattr(agent, "_codex_session") or agent._codex_session is None:
+  326:         from agent.runtime_cwd import resolve_agent_cwd
+```
+### agent/codex_runtime.py:375
+```python
+  371:                 progress_callback("tool.started", tool_name, preview, args)
+  372:             except Exception:
+  373:                 logger.debug("codex tool-progress callback raised", exc_info=True)
+  374: 
+  375:         agent._codex_session = CodexAppServerSession(
+  376:             cwd=cwd,
+  377:             approval_callback=approval_callback,
+  378:             request_routing=_ServerRequestRouting(
+  379:                 auto_approve_exec=auto_approve_requests,
+```
+### agent/transports/codex_app_server_session.py:10
+```python
+    6: and returns a clean turn result that AIAgent.run_conversation() can splice
+    7: into its `messages` list.
+    8: 
+    9: Lifecycle:
+   10:     session = CodexAppServerSession(cwd="/home/x/proj")
+   11:     session.ensure_started()                              # spawns + handshake + thread/start
+   12:     result = session.run_turn(user_input="hello")         # blocks until turn/completed
+   13:     # result.final_text          → assistant text returned to caller
+   14:     # result.projected_messages  → list of {role, content, ...} for messages list
+```
+### agent/transports/codex_app_server_session.py:192
+```python
+  188:     auto_approve_exec: bool = False
+  189:     auto_approve_apply_patch: bool = False
+  190: 
+  191: 
+  192: class CodexAppServerSession:
+  193:     """One Codex thread per Hermes session, lifetime owned by AIAgent.
+  194: 
+  195:     Not thread-safe — one caller drives it at a time, matching how AIAgent's
+  196:     run_conversation() loop is structured today. The codex client itself can
+```
+### agent/transports/codex_app_server_session.py:312
+```python
+  308:                 pass
+  309:             self._client = None
+  310:         self._thread_id = None
+  311: 
+  312:     def __enter__(self) -> "CodexAppServerSession":
+  313:         return self
+  314: 
+  315:     def __exit__(self, *exc: Any) -> None:
+  316:         self.close()
+```
+### agent/transports/hermes_tools_mcp_server.py:41
+```python
+   37:                                            drive them. See the inline
+   38:                                            comment on EXPOSED_TOOLS below.
+   39: 
+   40: Run with: python -m agent.transports.hermes_tools_mcp_server
+   41: Spawned by: CodexAppServerSession.ensure_started() when the runtime is
+   42:             active and config opts in.
+   43: """
+   44: 
+   45: from __future__ import annotations
+```
 
-## Delegate config and child construction
+## Matches for `codex_app_server`
+### agent/agent_init.py:423
+```python
+  419:     provider_name = provider.strip().lower() if isinstance(provider, str) and provider.strip() else None
+  420:     agent.provider = provider_name or ""
+  421:     agent.acp_command = acp_command or command
+  422:     agent.acp_args = list(acp_args or args or [])
+  423:     if api_mode in {"chat_completions", "codex_responses", "anthropic_messages", "bedrock_converse", "codex_app_server"}:
+  424:         agent.api_mode = api_mode
+  425:     elif agent.provider == "openai-codex":
+  426:         agent.api_mode = "codex_responses"
+  427:     elif agent.provider in {"xai", "xai-oauth"}:
+```
+### agent/agent_init.py:1573
+```python
+ 1569:     # compressor, so it rides on the agent.
+ 1570:     compression_in_place = is_truthy_value(
+ 1571:         _compression_cfg.get("in_place"), default=False
+ 1572:     )
+ 1573:     codex_app_server_auto_compaction = str(
+ 1574:         _compression_cfg.get("codex_app_server_auto", "native") or "native"
+ 1575:     ).lower()
+ 1576:     if codex_app_server_auto_compaction not in {"native", "hermes", "off"}:
+ 1577:         _ra().logger.warning(
+```
+### agent/agent_init.py:1574
+```python
+ 1570:     compression_in_place = is_truthy_value(
+ 1571:         _compression_cfg.get("in_place"), default=False
+ 1572:     )
+ 1573:     codex_app_server_auto_compaction = str(
+ 1574:         _compression_cfg.get("codex_app_server_auto", "native") or "native"
+ 1575:     ).lower()
+ 1576:     if codex_app_server_auto_compaction not in {"native", "hermes", "off"}:
+ 1577:         _ra().logger.warning(
+ 1578:             "Invalid compression.codex_app_server_auto=%r; using 'native'. "
+```
+### agent/agent_init.py:1576
+```python
+ 1572:     )
+ 1573:     codex_app_server_auto_compaction = str(
+ 1574:         _compression_cfg.get("codex_app_server_auto", "native") or "native"
+ 1575:     ).lower()
+ 1576:     if codex_app_server_auto_compaction not in {"native", "hermes", "off"}:
+ 1577:         _ra().logger.warning(
+ 1578:             "Invalid compression.codex_app_server_auto=%r; using 'native'. "
+ 1579:             "Valid values are: native, hermes, off.",
+ 1580:             codex_app_server_auto_compaction,
+```
+### agent/agent_init.py:1578
+```python
+ 1574:         _compression_cfg.get("codex_app_server_auto", "native") or "native"
+ 1575:     ).lower()
+ 1576:     if codex_app_server_auto_compaction not in {"native", "hermes", "off"}:
+ 1577:         _ra().logger.warning(
+ 1578:             "Invalid compression.codex_app_server_auto=%r; using 'native'. "
+ 1579:             "Valid values are: native, hermes, off.",
+ 1580:             codex_app_server_auto_compaction,
+ 1581:         )
+ 1582:         codex_app_server_auto_compaction = "native"
+```
+### agent/agent_init.py:1580
+```python
+ 1576:     if codex_app_server_auto_compaction not in {"native", "hermes", "off"}:
+ 1577:         _ra().logger.warning(
+ 1578:             "Invalid compression.codex_app_server_auto=%r; using 'native'. "
+ 1579:             "Valid values are: native, hermes, off.",
+ 1580:             codex_app_server_auto_compaction,
+ 1581:         )
+ 1582:         codex_app_server_auto_compaction = "native"
+ 1583: 
+ 1584:     # Read optional explicit context_length override for the auxiliary
+```
+### agent/agent_init.py:1582
+```python
+ 1578:             "Invalid compression.codex_app_server_auto=%r; using 'native'. "
+ 1579:             "Valid values are: native, hermes, off.",
+ 1580:             codex_app_server_auto_compaction,
+ 1581:         )
+ 1582:         codex_app_server_auto_compaction = "native"
+ 1583: 
+ 1584:     # Read optional explicit context_length override for the auxiliary
+ 1585:     # compression model. Custom endpoints often cannot report this via
+ 1586:     # /models, so the startup feasibility check needs the config hint.
+```
+### agent/agent_init.py:1837
+```python
+ 1833:         except Exception:
+ 1834:             pass
+ 1835:     agent.compression_enabled = compression_enabled
+ 1836:     agent.compression_in_place = compression_in_place
+ 1837:     agent.codex_app_server_auto_compaction = codex_app_server_auto_compaction
+ 1838: 
+ 1839:     # Reject models whose context window is below the minimum required
+ 1840:     # for reliable tool-calling workflows (64K tokens).
+ 1841:     _ctx = getattr(agent.context_compressor, "context_length", 0)
+```
+### agent/background_review.py:50
+```python
+   46: def _resolve_review_runtime(agent: Any) -> Dict[str, Any]:
+   47:     """Resolve provider/model/credentials for the review fork.
+   48: 
+   49:     Default (auto / unset / same as parent): inherit the parent's live runtime
+   50:     (with codex_app_server -> codex_responses downgrade). ``routed`` is False —
+   51:     the fork uses the main model and the warm cache, exactly as before. When
+   52:     ``auxiliary.background_review.{provider,model}`` names a concrete model
+   53:     different from the parent's, resolve that runtime and set ``routed=True``.
+   54:     """
+```
+### agent/background_review.py:57
+```python
+   53:     different from the parent's, resolve that runtime and set ``routed=True``.
+   54:     """
+   55:     parent_runtime = agent._current_main_runtime()
+   56:     parent_api_mode = parent_runtime.get("api_mode") or None
+   57:     if parent_api_mode == "codex_app_server":
+   58:         parent_api_mode = "codex_responses"
+   59:     parent = {
+   60:         "provider": agent.provider,
+   61:         "model": agent.model,
+```
+### agent/background_review.py:661
+```python
+  657:             # "No LLM provider configured" warning at end of turn.
+  658:             # _resolve_review_runtime() returns the parent's live runtime by
+  659:             # default (routed=False; main model, warm cache), or — when the user
+  660:             # set auxiliary.background_review.{provider,model} to a different
+  661:             # model — that model's runtime (routed=True). The codex_app_server
+  662:             # -> codex_responses downgrade is applied inside the resolver.
+  663:             _rt = _resolve_review_runtime(agent)
+  664:             _routed = bool(_rt.get("routed"))
+  665:             # skip_memory=True keeps the review fork from
+```
+### agent/codex_runtime.py:8
+```python
+    4: Each function takes the parent ``AIAgent`` as its first argument
+    5: (``agent``).  AIAgent keeps thin forwarder methods for backward
+    6: compatibility.
+    7: 
+    8: * ``run_codex_app_server_turn`` — drives one turn through the
+    9:   ``codex_app_server`` subprocess client (used when a Codex CLI install
+   10:   is the active provider).
+   11: * ``run_codex_stream`` — streams a Codex Responses API call (the
+   12:   ``codex_responses`` api_mode).
+```
+### agent/codex_runtime.py:9
+```python
+    5: (``agent``).  AIAgent keeps thin forwarder methods for backward
+    6: compatibility.
+    7: 
+    8: * ``run_codex_app_server_turn`` — drives one turn through the
+    9:   ``codex_app_server`` subprocess client (used when a Codex CLI install
+   10:   is the active provider).
+   11: * ``run_codex_stream`` — streams a Codex Responses API call (the
+   12:   ``codex_responses`` api_mode).
+   13: * ``run_codex_create_stream_fallback`` — recovery path when the
+```
+### agent/codex_runtime.py:98
+```python
+   94:             return 0
+   95:     return 0
+   96: 
+   97: 
+   98: def _record_codex_app_server_usage(agent, turn) -> dict[str, Any]:
+   99:     """Translate Codex app-server token usage into Hermes accounting.
+  100: 
+  101:     Codex app-server reports usage via thread/tokenUsage/updated as:
+  102:     inputTokens, cachedInputTokens, outputTokens, reasoningOutputTokens,
+```
+### agent/codex_runtime.py:231
+```python
+  227:         "cost_source": cost_result.source,
+  228:     }
+  229: 
+  230: 
+  231: def _record_codex_app_server_compaction(
+  232:     agent,
+  233:     turn,
+  234:     *,
+  235:     approx_tokens: int | None = None,
+```
+### agent/codex_runtime.py:290
+```python
+  286:                         compressor, "compression_count", 0
+  287:                     )
+  288:                     if compressor is not None
+  289:                     else 0,
+  290:                     "runtime": "codex_app_server",
+  291:                     "thread_id": thread_id,
+  292:                     "turn_id": turn_id,
+  293:                 },
+  294:             )
+```
+### agent/codex_runtime.py:301
+```python
+  297: 
+  298:     return True
+  299: 
+  300: 
+  301: def run_codex_app_server_turn(
+  302:     agent,
+  303:     *,
+  304:     user_message: str,
+  305:     original_user_message: Any,
+```
+### agent/codex_runtime.py:314
+```python
+  310:     """Codex app-server runtime path. Hands the entire turn to a `codex
+  311:     app-server` subprocess and projects its events back into Hermes'
+  312:     messages list so memory/skill review keep working.
+  313: 
+  314:     Called from run_conversation() when agent.api_mode == "codex_app_server".
+  315:     Returns the same dict shape as the chat_completions path.
+  316:     """
+  317:     from agent.transports.codex_app_server_session import (
+  318:         CodexAppServerSession,
+```
+### agent/codex_runtime.py:317
+```python
+  313: 
+  314:     Called from run_conversation() when agent.api_mode == "codex_app_server".
+  315:     Returns the same dict shape as the chat_completions path.
+  316:     """
+  317:     from agent.transports.codex_app_server_session import (
+  318:         CodexAppServerSession,
+  319:         _ServerRequestRouting,
+  320:     )
+  321: 
+```
+### agent/codex_runtime.py:466
+```python
+  462:     # and that loop is bypassed on this path.
+  463:     agent._iters_since_skill = (
+  464:         getattr(agent, "_iters_since_skill", 0) + turn.tool_iterations
+  465:     )
+  466:     _record_codex_app_server_compaction(agent, turn)
+  467:     usage_result = _record_codex_app_server_usage(agent, turn)
+  468:     api_calls = 1
+  469: 
+  470:     # Now check the skill nudge AFTER iters were incremented — same
+```
+### agent/codex_runtime.py:467
+```python
+  463:     agent._iters_since_skill = (
+  464:         getattr(agent, "_iters_since_skill", 0) + turn.tool_iterations
+  465:     )
+  466:     _record_codex_app_server_compaction(agent, turn)
+  467:     usage_result = _record_codex_app_server_usage(agent, turn)
+  468:     api_calls = 1
+  469: 
+  470:     # Now check the skill nudge AFTER iters were incremented — same
+  471:     # pattern the chat_completions path uses (line ~15432).
+```
+### agent/codex_runtime.py:926
+```python
+  922:     return run_codex_stream(agent, api_kwargs, client=client)
+  923: 
+  924: 
+  925: __all__ = [
+  926:     "run_codex_app_server_turn",
+  927:     "run_codex_stream",
+  928:     "run_codex_create_stream_fallback",
+  929:     "_consume_codex_event_stream",
+  930: ]
+```
+### agent/conversation_compression.py:472
+```python
+  468:     # Codex app-server sessions: the codex agent owns the real thread context;
+  469:     # Hermes' summarizer would only rewrite a local mirror without shrinking
+  470:     # the actual thread (#36801). Route compaction to the app server's own
+  471:     # thread/compact mechanism. Behavior is controlled by
+  472:     # ``compression.codex_app_server_auto`` (native|hermes|off).
+  473:     if getattr(agent, "api_mode", None) == "codex_app_server":
+  474:         return _compress_context_via_codex_app_server(
+  475:             agent,
+  476:             messages,
+```
+### agent/conversation_compression.py:473
+```python
+  469:     # Hermes' summarizer would only rewrite a local mirror without shrinking
+  470:     # the actual thread (#36801). Route compaction to the app server's own
+  471:     # thread/compact mechanism. Behavior is controlled by
+  472:     # ``compression.codex_app_server_auto`` (native|hermes|off).
+  473:     if getattr(agent, "api_mode", None) == "codex_app_server":
+  474:         return _compress_context_via_codex_app_server(
+  475:             agent,
+  476:             messages,
+  477:             system_message,
+```
+### agent/conversation_compression.py:474
+```python
+  470:     # the actual thread (#36801). Route compaction to the app server's own
+  471:     # thread/compact mechanism. Behavior is controlled by
+  472:     # ``compression.codex_app_server_auto`` (native|hermes|off).
+  473:     if getattr(agent, "api_mode", None) == "codex_app_server":
+  474:         return _compress_context_via_codex_app_server(
+  475:             agent,
+  476:             messages,
+  477:             system_message,
+  478:             approx_tokens=approx_tokens,
+```
+### agent/conversation_compression.py:989
+```python
+  985:         # acquire on that — no race against our just-finished work.
+  986:         _release_lock()
+  987: 
+  988: 
+  989: def _compress_context_via_codex_app_server(
+  990:     agent: Any,
+  991:     messages: list,
+  992:     system_message: Optional[str],
+  993:     *,
+```
+### agent/conversation_compression.py:1006
+```python
+ 1002:     runtime, ask Codex to compact its own thread and keep Hermes' transcript
+ 1003:     unchanged.
+ 1004:     """
+ 1005:     auto_mode = str(
+ 1006:         getattr(agent, "codex_app_server_auto_compaction", "native") or "native"
+ 1007:     ).lower()
+ 1008:     if auto_mode not in {"native", "hermes", "off"}:
+ 1009:         auto_mode = "native"
+ 1010:     if not force and auto_mode != "hermes":
+```
+### agent/conversation_compression.py:1071
+```python
+ 1067:         return messages, existing_prompt
+ 1068: 
+ 1069:     try:
+ 1070:         from agent.codex_runtime import (
+ 1071:             _record_codex_app_server_compaction,
+ 1072:             _record_codex_app_server_usage,
+ 1073:         )
+ 1074: 
+ 1075:         _record_codex_app_server_compaction(
+```
+### agent/conversation_compression.py:1072
+```python
+ 1068: 
+ 1069:     try:
+ 1070:         from agent.codex_runtime import (
+ 1071:             _record_codex_app_server_compaction,
+ 1072:             _record_codex_app_server_usage,
+ 1073:         )
+ 1074: 
+ 1075:         _record_codex_app_server_compaction(
+ 1076:             agent,
+```
+### agent/conversation_compression.py:1075
+```python
+ 1071:             _record_codex_app_server_compaction,
+ 1072:             _record_codex_app_server_usage,
+ 1073:         )
+ 1074: 
+ 1075:         _record_codex_app_server_compaction(
+ 1076:             agent,
+ 1077:             result,
+ 1078:             approx_tokens=approx_tokens,
+ 1079:             force=True,
+```
+### agent/conversation_compression.py:1082
+```python
+ 1078:             approx_tokens=approx_tokens,
+ 1079:             force=True,
+ 1080:         )
+ 1081:         if getattr(result, "token_usage_last", None):
+ 1082:             _record_codex_app_server_usage(agent, result)
+ 1083:     except Exception:
+ 1084:         logger.debug("codex compaction bookkeeping failed", exc_info=True)
+ 1085: 
+ 1086:     try:
+```
+### agent/conversation_loop.py:624
+```python
+  620:     # so this tally caps same-entry refreshes and lets the fallback chain take
+  621:     # over instead of spinning. Reset here so each turn starts fresh. See #26080.
+  622:     agent._auth_pool_refresh_counts = {}
+  623: 
+  624:     # Optional opt-in runtime: if api_mode == codex_app_server, hand the
+  625:     # turn to the codex app-server subprocess (terminal/file ops/patching
+  626:     # all run inside Codex). Default Hermes path is bypassed entirely.
+  627:     # See agent/transports/codex_app_server_session.py for the adapter
+  628:     # and references/codex-app-server-runtime.md for the rationale.
+```
+### agent/conversation_loop.py:627
+```python
+  623: 
+  624:     # Optional opt-in runtime: if api_mode == codex_app_server, hand the
+  625:     # turn to the codex app-server subprocess (terminal/file ops/patching
+  626:     # all run inside Codex). Default Hermes path is bypassed entirely.
+  627:     # See agent/transports/codex_app_server_session.py for the adapter
+  628:     # and references/codex-app-server-runtime.md for the rationale.
+  629:     if agent.api_mode == "codex_app_server":
+  630:         return agent._run_codex_app_server_turn(
+  631:             user_message=user_message,
+```
+### agent/conversation_loop.py:629
+```python
+  625:     # turn to the codex app-server subprocess (terminal/file ops/patching
+  626:     # all run inside Codex). Default Hermes path is bypassed entirely.
+  627:     # See agent/transports/codex_app_server_session.py for the adapter
+  628:     # and references/codex-app-server-runtime.md for the rationale.
+  629:     if agent.api_mode == "codex_app_server":
+  630:         return agent._run_codex_app_server_turn(
+  631:             user_message=user_message,
+  632:             original_user_message=original_user_message,
+  633:             messages=messages,
+```
+### agent/conversation_loop.py:630
+```python
+  626:     # all run inside Codex). Default Hermes path is bypassed entirely.
+  627:     # See agent/transports/codex_app_server_session.py for the adapter
+  628:     # and references/codex-app-server-runtime.md for the rationale.
+  629:     if agent.api_mode == "codex_app_server":
+  630:         return agent._run_codex_app_server_turn(
+  631:             user_message=user_message,
+  632:             original_user_message=original_user_message,
+  633:             messages=messages,
+  634:             effective_task_id=effective_task_id,
+```
+### agent/transports/codex_app_server.py:13
+```python
+    9: projection into Hermes' display, approval bridging, transcript projection into
+   10: AIAgent.messages, plugin migration) live in sibling modules.
+   11: 
+   12: Status: optional opt-in runtime gated behind `model.openai_runtime ==
+   13: "codex_app_server"`. Hermes' default tool dispatch is unchanged when this
+   14: runtime is not selected.
+   15: """
+   16: 
+   17: from __future__ import annotations
+```
+### agent/transports/codex_app_server_session.py:36
+```python
+   32: from typing import Any, Callable, Optional
+   33: 
+   34: from agent.codex_responses_adapter import _format_responses_error
+   35: from agent.redact import redact_sensitive_text
+   36: from agent.transports.codex_app_server import (
+   37:     CodexAppServerClient,
+   38:     CodexAppServerError,
+   39: )
+   40: from agent.transports.codex_event_projector import CodexEventProjector
+```
+### agent/transports/hermes_tools_mcp_server.py:1
+```python
+    1: """Hermes-tools-as-MCP server for the codex_app_server runtime.
+    2: 
+    3: When the user runs `openai/*` turns through the codex app-server, codex
+    4: owns the loop and builds its own tool list. By default, that means
+    5: Hermes' richer tool surface — web search, browser automation,
+```
+### agent/transports/hermes_tools_mcp_server.py:67
+```python
+   63: #   - delegate_task / memory / session_search / todo — these are
+   64: #     `_AGENT_LOOP_TOOLS` in Hermes (model_tools.py:493). They require
+   65: #     the running AIAgent context to dispatch (mid-loop state), so a
+   66: #     stateless MCP callback can't drive them. Hermes' default runtime
+   67: #     keeps these working; the codex_app_server runtime cannot.
+   68: EXPOSED_TOOLS: tuple[str, ...] = (
+   69:     "web_search",
+   70:     "web_extract",
+   71:     "browser_navigate",
+```
+### agent/transports/hermes_tools_mcp_server.py:88
+```python
+   84:     "skills_list",
+   85:     "text_to_speech",
+   86:     # Kanban worker handoff tools — gated on HERMES_KANBAN_TASK env var
+   87:     # (set by the kanban dispatcher when spawning a worker). Without these
+   88:     # in the callback, a worker spawned with openai_runtime=codex_app_server
+   89:     # could do the work but couldn't report completion back to the kernel,
+   90:     # making it hang until timeout. Stateless dispatch — they just read
+   91:     # the env var and write to ~/.hermes/kanban.db.
+   92:     "kanban_complete",
+```
+### agent/turn_context.py:375
+```python
+  371:         _preflight_deferred = _defer_preflight(_preflight_tokens)
+  372:         # Codex app-server threads are compacted by the codex agent itself;
+  373:         # Hermes only initiates compaction in "hermes" mode (#36801).
+  374:         _codex_native_auto = (
+  375:             getattr(agent, "api_mode", None) == "codex_app_server"
+  376:             and str(
+  377:                 getattr(
+  378:                     agent,
+  379:                     "codex_app_server_auto_compaction",
+```
+### agent/turn_context.py:379
+```python
+  375:             getattr(agent, "api_mode", None) == "codex_app_server"
+  376:             and str(
+  377:                 getattr(
+  378:                     agent,
+  379:                     "codex_app_server_auto_compaction",
+  380:                     "native",
+  381:                 )
+  382:                 or "native"
+  383:             ).lower()
+```
+### agent/turn_context.py:418
+```python
+  414:         elif _codex_native_auto:
+  415:             logger.info(
+  416:                 "Skipping Hermes preflight compression for codex app-server "
+  417:                 "(mode=%s); Hermes will not start thread compaction here.",
+  418:                 getattr(agent, "codex_app_server_auto_compaction", "native"),
+  419:             )
+  420:         elif _compressor.should_compress(_preflight_tokens):
+  421:             logger.info(
+  422:                 "Preflight compression: ~%s tokens >= %s threshold (model %s, ctx %s)",
+```
+### hermes_cli/banner.py:844
+```python
+  840:     summary_parts = [f"{len(tools)} tools", f"{total_skills} skills"]
+  841:     if mcp_connected:
+  842:         summary_parts.append(f"{mcp_connected} MCP servers")
+  843:     summary_parts.append("/help for commands")
+  844:     # Indicate when the codex_app_server runtime is active so users
+  845:     # understand why tool counts may not match what's actually reachable
+  846:     # (codex builds its own tool list inside the spawned subprocess).
+  847:     try:
+  848:         from hermes_cli.codex_runtime_switch import get_current_runtime
+```
+### hermes_cli/banner.py:850
+```python
+  846:     # (codex builds its own tool list inside the spawned subprocess).
+  847:     try:
+  848:         from hermes_cli.codex_runtime_switch import get_current_runtime
+  849:         from hermes_cli.config import load_config as _load_cfg
+  850:         if get_current_runtime(_load_cfg()) == "codex_app_server":
+  851:             right_lines.append(
+  852:                 f"[bold {accent}]Runtime:[/] [{text}]codex app-server[/] "
+  853:                 f"[dim {dim}](terminal/file ops/MCP run inside codex)[/]"
+  854:             )
+```
+### hermes_cli/codex_runtime_plugin_migration.py:4
+```python
+    1: """Migrate Hermes' MCP server config and Codex's installed curated plugins
+    2: to the format Codex expects in ~/.codex/config.toml.
+    3: 
+    4: When the user enables the codex_app_server runtime, the codex subprocess
+    5: runs its own MCP client and its own plugin runtime (Linear, Atlassian,
+    6: Asana, plus per-account ChatGPT apps via app/list). For both of those to
+    7: be useful, the user's choices need to be visible to codex too. This
+    8: module:
+```
+### hermes_cli/codex_runtime_plugin_migration.py:466
+```python
+  462:     ([], error_message). Migration treats this as non-fatal — MCP
+  463:     servers and permissions still write through.
+  464:     """
+  465:     try:
+  466:         from agent.transports.codex_app_server import CodexAppServerClient
+  467:     except Exception as exc:
+  468:         return [], f"transport unavailable: {exc}"
+  469: 
+  470:     try:
+```
+### hermes_cli/codex_runtime_switch.py:4
+```python
+    1: """Shared logic for the /codex-runtime slash command.
+    2: 
+    3: Toggles `model.openai_runtime` between "auto" (= chat_completions, Hermes'
+    4: default) and "codex_app_server" (= hand turns to a codex subprocess).
+    5: 
+    6: Both CLI (cli.py) and gateway (gateway/run.py) call into this module so the
+    7: behavior stays identical across surfaces.
+    8: 
+```
+### hermes_cli/codex_runtime_switch.py:10
+```python
+    6: Both CLI (cli.py) and gateway (gateway/run.py) call into this module so the
+    7: behavior stays identical across surfaces.
+    8: 
+    9: The actual runtime resolution happens in hermes_cli.runtime_provider's
+   10: _maybe_apply_codex_app_server_runtime() helper, which reads the persisted
+   11: config value. This module just persists the value and reports the change.
+   12: """
+   13: 
+   14: from __future__ import annotations
+```
+### hermes_cli/codex_runtime_switch.py:23
+```python
+   19: 
+   20: logger = logging.getLogger(__name__)
+   21: 
+   22: 
+   23: VALID_RUNTIMES = ("auto", "codex_app_server")
+   24: 
+   25: 
+   26: @dataclass
+   27: class CodexRuntimeStatus:
+```
+### hermes_cli/codex_runtime_switch.py:44
+```python
+   40: def parse_args(arg_string: str) -> tuple[Optional[str], list[str]]:
+   41:     """Parse the slash-command argument string. Returns (value, errors).
+   42: 
+   43:     No args         → return current state (value=None)
+   44:     'auto' / 'codex_app_server' / 'on' / 'off' → return that value
+   45:     anything else   → error
+   46:     """
+   47:     raw = (arg_string or "").strip().lower()
+   48:     if not raw:
+```
+### hermes_cli/codex_runtime_switch.py:52
+```python
+   48:     if not raw:
+   49:         return None, []
+   50:     # Accept human-friendly synonyms
+   51:     if raw in {"on", "codex", "enable"}:
+   52:         return "codex_app_server", []
+   53:     if raw in {"off", "default", "disable", "hermes"}:
+   54:         return "auto", []
+   55:     if raw in VALID_RUNTIMES:
+   56:         return raw, []
+```
+### hermes_cli/codex_runtime_switch.py:58
+```python
+   54:         return "auto", []
+   55:     if raw in VALID_RUNTIMES:
+   56:         return raw, []
+   57:     return None, [
+   58:         f"Unknown runtime {raw!r}. Use one of: auto, codex_app_server, on, off"
+   59:     ]
+   60: 
+   61: 
+   62: def get_current_runtime(config: dict) -> str:
+```
+### hermes_cli/codex_runtime_switch.py:94
+```python
+   90: def check_codex_binary_ok() -> tuple[bool, Optional[str]]:
+   91:     """Best-effort verification that codex CLI is installed at acceptable
+   92:     version. Returns (ok, version_or_message)."""
+   93:     try:
+   94:         from agent.transports.codex_app_server import check_codex_binary
+   95: 
+   96:         return check_codex_binary()
+   97:     except Exception as exc:  # pragma: no cover
+   98:         return False, f"codex check failed: {exc}"
+```
+### hermes_cli/codex_runtime_switch.py:148
+```python
+  144:             codex_version=ver if ok else None,
+  145:         )
+  146: 
+  147:     # No-config-change paths. For `auto` we return immediately — disabling
+  148:     # doesn't touch ~/.codex/. For `codex_app_server`, we fall through to
+  149:     # the migration block below: the config value is already correct, but
+  150:     # the world state (managed block in ~/.codex/config.toml, hermes-tools
+  151:     # MCP callback, plugin discovery) may be stale or missing — common
+  152:     # footgun when users pre-set `openai_runtime: codex_app_server` in
+```
+### hermes_cli/codex_runtime_switch.py:152
+```python
+  148:     # doesn't touch ~/.codex/. For `codex_app_server`, we fall through to
+  149:     # the migration block below: the config value is already correct, but
+  150:     # the world state (managed block in ~/.codex/config.toml, hermes-tools
+  151:     # MCP callback, plugin discovery) may be stale or missing — common
+  152:     # footgun when users pre-set `openai_runtime: codex_app_server` in
+  153:     # config.yaml without ever running the slash command. The migration is
+  154:     # idempotent by design (it replaces its own managed block in place), so
+  155:     # re-running is cheap and safe.
+  156:     reapplying_enable = new_value == current == "codex_app_server"
+```
+### hermes_cli/codex_runtime_switch.py:156
+```python
+  152:     # footgun when users pre-set `openai_runtime: codex_app_server` in
+  153:     # config.yaml without ever running the slash command. The migration is
+  154:     # idempotent by design (it replaces its own managed block in place), so
+  155:     # re-running is cheap and safe.
+  156:     reapplying_enable = new_value == current == "codex_app_server"
+  157:     if new_value == current and not reapplying_enable:
+  158:         return CodexRuntimeStatus(
+  159:             success=True,
+  160:             new_value=current,
+```
+### hermes_cli/codex_runtime_switch.py:168
+```python
+  164: 
+  165:     # If switching ON, verify codex CLI is installed before persisting —
+  166:     # an opt-in toggle that silently fails on the first turn is the
+  167:     # worst possible UX. Block here with a clear install hint.
+  168:     if new_value == "codex_app_server":
+  169:         ok, ver_or_msg = _check_binary_cached()
+  170:         if not ok:
+  171:             return CodexRuntimeStatus(
+  172:                 success=False,
+```
+### hermes_cli/codex_runtime_switch.py:176
+```python
+  172:                 success=False,
+  173:                 new_value=None,
+  174:                 old_value=current,
+  175:                 message=(
+  176:                     "Cannot enable codex_app_server runtime: "
+  177:                     f"{ver_or_msg or 'codex CLI not available'}\n"
+  178:                     "Install with: npm i -g @openai/codex"
+  179:                 ),
+  180:                 codex_binary_ok=False,
+```
+### hermes_cli/codex_runtime_switch.py:204
+```python
+  200:             f"openai_runtime already set to {current} — re-applying migration"
+  201:         ]
+  202:     else:
+  203:         msg_lines = [f"openai_runtime: {current} → {new_value}"]
+  204:     if new_value == "codex_app_server":
+  205:         ok, ver = _check_binary_cached()
+  206:         if ok:
+  207:             msg_lines.append(f"codex CLI: {ver}")
+  208:         # Auto-migrate Hermes' MCP servers + Codex's installed curated
+```
+### hermes_cli/commands.py:138
+```python
+  134:     CommandDef("model", "Switch model (persists by default)", "Configuration",
+  135:                args_hint="[model] [--provider name] [--global|--session] [--refresh]"),
+  136:     CommandDef("codex-runtime", "Toggle codex app-server runtime for OpenAI/Codex models",
+  137:                "Configuration", aliases=("codex_runtime",),
+  138:                args_hint="[auto|codex_app_server]"),
+  139: 
+  140:     CommandDef("personality", "Set a predefined personality", "Configuration",
+  141:                args_hint="[name]"),
+  142:     CommandDef("statusbar", "Toggle the context/model status bar", "Configuration",
+```
+### hermes_cli/config.py:1436
+```python
+ 1432:         "codex_gpt55_autoraise_notice": True,  # Display the one-time Codex gpt-5.4/5.5
+ 1433:                                       # autoraise banner. Set False to keep the
+ 1434:                                       # 85% threshold autoraise but suppress the
+ 1435:                                       # user-facing notice in CLI/gateway output.
+ 1436:         "codex_app_server_auto": "native",  # Codex app-server (codex CLI runtime) thread
+ 1437:                                       # compaction mode. The codex agent owns the real
+ 1438:                                       # thread context, so Hermes' summarizer cannot
+ 1439:                                       # shrink it (#36801). native = codex decides when
+ 1440:                                       # to compact its own thread (default); hermes =
+```
+### hermes_cli/runtime_provider.py:340
+```python
+  336:     "bedrock_converse",
+  337:     # Optional opt-in: hand the entire turn to a `codex app-server` subprocess
+  338:     # so terminal/file-ops/patching/sandboxing run inside Codex's own runtime
+  339:     # instead of Hermes' tool dispatch. Gated behind config key
+  340:     # `model.openai_runtime == "codex_app_server"` AND provider in
+  341:     # {"openai", "openai-codex"}. Default is unchanged.
+  342:     "codex_app_server",
+  343: }
+  344: 
+```
+### hermes_cli/runtime_provider.py:342
+```python
+  338:     # so terminal/file-ops/patching/sandboxing run inside Codex's own runtime
+  339:     # instead of Hermes' tool dispatch. Gated behind config key
+  340:     # `model.openai_runtime == "codex_app_server"` AND provider in
+  341:     # {"openai", "openai-codex"}. Default is unchanged.
+  342:     "codex_app_server",
+  343: }
+  344: 
+  345: 
+  346: def _parse_api_mode(raw: Any) -> Optional[str]:
+```
+### hermes_cli/runtime_provider.py:366
+```python
+  362:     """
+  363:     return _nous_inference_env_override() or ""
+  364: 
+  365: 
+  366: def _maybe_apply_codex_app_server_runtime(
+  367:     *,
+  368:     provider: str,
+  369:     api_mode: str,
+  370:     model_cfg: Optional[Dict[str, Any]],
+```
+### hermes_cli/runtime_provider.py:372
+```python
+  368:     provider: str,
+  369:     api_mode: str,
+  370:     model_cfg: Optional[Dict[str, Any]],
+  371: ) -> str:
+  372:     """Optional opt-in: rewrite api_mode → "codex_app_server" for OpenAI/Codex
+  373:     providers when the user has explicitly enabled that runtime via
+  374:     `model.openai_runtime: codex_app_server` in config.yaml.
+  375: 
+  376:     Default behavior is preserved: when the key is unset, "auto", or empty,
+```
+### hermes_cli/runtime_provider.py:374
+```python
+  370:     model_cfg: Optional[Dict[str, Any]],
+  371: ) -> str:
+  372:     """Optional opt-in: rewrite api_mode → "codex_app_server" for OpenAI/Codex
+  373:     providers when the user has explicitly enabled that runtime via
+  374:     `model.openai_runtime: codex_app_server` in config.yaml.
+  375: 
+  376:     Default behavior is preserved: when the key is unset, "auto", or empty,
+  377:     this function is a no-op. Only providers in {"openai", "openai-codex"}
+  378:     are eligible — other providers (anthropic, openrouter, etc.) cannot be
+```
+### hermes_cli/runtime_provider.py:387
+```python
+  383:         return api_mode
+  384:     if provider not in {"openai", "openai-codex"}:
+  385:         return api_mode
+  386:     runtime = str(model_cfg.get("openai_runtime") or "").strip().lower()
+  387:     if runtime == "codex_app_server":
+  388:         return "codex_app_server"
+  389:     return api_mode
+  390: 
+  391: 
+```
+### hermes_cli/runtime_provider.py:388
+```python
+  384:     if provider not in {"openai", "openai-codex"}:
+  385:         return api_mode
+  386:     runtime = str(model_cfg.get("openai_runtime") or "").strip().lower()
+  387:     if runtime == "codex_app_server":
+  388:         return "codex_app_server"
+  389:     return api_mode
+  390: 
+  391: 
+  392: def _resolve_runtime_from_pool_entry(
+```
+### hermes_cli/runtime_provider.py:517
+```python
+  513:         base_url = normalize_opencode_base_url(provider, api_mode, base_url)
+  514: 
+  515:     # Optional opt-in: route OpenAI/Codex turns through `codex app-server`.
+  516:     # Inert when `model.openai_runtime` is unset or "auto".
+  517:     api_mode = _maybe_apply_codex_app_server_runtime(
+  518:         provider=provider, api_mode=api_mode, model_cfg=model_cfg
+  519:     )
+  520: 
+  521:     if provider == "lmstudio":
+```
+### run_agent.py:5784
+```python
+ 5780:         """
+ 5781:         result = self.run_conversation(message, stream_callback=stream_callback)
+ 5782:         return result["final_response"]
+ 5783: 
+ 5784:     def _run_codex_app_server_turn(
+ 5785:         self,
+ 5786:         *,
+ 5787:         user_message: str,
+ 5788:         original_user_message: Any,
+```
+### run_agent.py:5793
+```python
+ 5789:         messages: List[Dict[str, Any]],
+ 5790:         effective_task_id: str,
+ 5791:         should_review_memory: bool = False,
+ 5792:     ) -> Dict[str, Any]:
+ 5793:         """Forwarder — see ``agent.codex_runtime.run_codex_app_server_turn``."""
+ 5794:         from agent.codex_runtime import run_codex_app_server_turn
+ 5795:         return run_codex_app_server_turn(self, user_message=user_message, original_user_message=original_user_message, messages=messages, effective_task_id=effective_task_id, should_review_memory=should_review_memory)
+ 5796: 
+ 5797: def main(
+```
+### run_agent.py:5794
+```python
+ 5790:         effective_task_id: str,
+ 5791:         should_review_memory: bool = False,
+ 5792:     ) -> Dict[str, Any]:
+ 5793:         """Forwarder — see ``agent.codex_runtime.run_codex_app_server_turn``."""
+ 5794:         from agent.codex_runtime import run_codex_app_server_turn
+ 5795:         return run_codex_app_server_turn(self, user_message=user_message, original_user_message=original_user_message, messages=messages, effective_task_id=effective_task_id, should_review_memory=should_review_memory)
+ 5796: 
+ 5797: def main(
+ 5798:     query: str = None,
+```
+### run_agent.py:5795
+```python
+ 5791:         should_review_memory: bool = False,
+ 5792:     ) -> Dict[str, Any]:
+ 5793:         """Forwarder — see ``agent.codex_runtime.run_codex_app_server_turn``."""
+ 5794:         from agent.codex_runtime import run_codex_app_server_turn
+ 5795:         return run_codex_app_server_turn(self, user_message=user_message, original_user_message=original_user_message, messages=messages, effective_task_id=effective_task_id, should_review_memory=should_review_memory)
+ 5796: 
+ 5797: def main(
+ 5798:     query: str = None,
+ 5799:     model: str = "",
+```
 
-## Codex app-server construction sites
+## Matches for `on_event`
+### agent/auxiliary_client.py:1079
+```python
+ 1075:             try:
+ 1076:                 final = _consume_codex_event_stream(
+ 1077:                     event_stream,
+ 1078:                     model=resp_kwargs.get("model"),
+ 1079:                     on_event=_on_each_event,
+ 1080:                 )
+ 1081:             finally:
+ 1082:                 close_fn = getattr(event_stream, "close", None)
+ 1083:                 if callable(close_fn):
+```
+### agent/codex_runtime.py:382
+```python
+  378:             request_routing=_ServerRequestRouting(
+  379:                 auto_approve_exec=auto_approve_requests,
+  380:                 auto_approve_apply_patch=auto_approve_requests,
+  381:             ),
+  382:             on_event=_on_codex_event,
+  383:         )
+  384: 
+  385:     # NOTE: the user message is ALREADY appended to messages by the
+  386:     # standard run_conversation() flow (line ~11823) before the early
+```
+### agent/codex_runtime.py:604
+```python
+  600:     model: str,
+  601:     on_text_delta=None,
+  602:     on_reasoning_delta=None,
+  603:     on_first_delta=None,
+  604:     on_event=None,
+  605:     interrupt_check=None,
+  606: ) -> SimpleNamespace:
+  607:     """Consume a Codex Responses SSE event stream and return a final response.
+  608: 
+```
+### agent/codex_runtime.py:636
+```python
+  632:       once a function_call event is seen (so tool-call turns don't bleed text
+  633:       into the chat).
+  634:     * ``on_reasoning_delta(str)`` — fires per ``response.reasoning.*.delta``.
+  635:     * ``on_first_delta()`` — one-shot, fires on the first text delta only.
+  636:     * ``on_event(event)`` — fires for every event before any other processing.
+  637:       Used for watchdog activity, debug logging, anything wire-shape-agnostic.
+  638:     * ``interrupt_check()`` — returns True to break the loop early.
+  639:     """
+  640:     collected_output_items: List[Any] = []
+```
+### agent/codex_runtime.py:653
+```python
+  649:     terminal_error: Any = None
+  650:     saw_terminal = False
+  651: 
+  652:     for event in event_iter:
+  653:         if on_event is not None:
+  654:             try:
+  655:                 on_event(event)
+  656:             except (TimeoutError, InterruptedError):
+  657:                 # Control-flow signals from watchdog/cancellation hooks must
+```
+### agent/codex_runtime.py:655
+```python
+  651: 
+  652:     for event in event_iter:
+  653:         if on_event is not None:
+  654:             try:
+  655:                 on_event(event)
+  656:             except (TimeoutError, InterruptedError):
+  657:                 # Control-flow signals from watchdog/cancellation hooks must
+  658:                 # propagate, not get swallowed as "debug noise".
+  659:                 raise
+```
+### agent/codex_runtime.py:663
+```python
+  659:                 raise
+  660:             except Exception:
+  661:                 # Genuine bugs in third-party debug/log hooks shouldn't break
+  662:                 # stream consumption.
+  663:                 logger.debug("Codex stream on_event hook raised", exc_info=True)
+  664:         if interrupt_check is not None and interrupt_check():
+  665:             break
+  666: 
+  667:         event_type = _event_field(event, "type", "")
+```
+### agent/codex_runtime.py:840
+```python
+  836: 
+  837:     def _on_reasoning_delta(text: str) -> None:
+  838:         agent._fire_reasoning_delta(text)
+  839: 
+  840:     def _on_event(event: Any) -> None:
+  841:         # TTFB watchdog and activity touch — runs once per SSE event.
+  842:         agent._codex_stream_last_event_ts = time.time()
+  843:         agent._touch_activity("receiving stream response")
+  844: 
+```
+### agent/codex_runtime.py:880
+```python
+  876:                     model=api_kwargs.get("model"),
+  877:                     on_text_delta=_on_text_delta,
+  878:                     on_reasoning_delta=_on_reasoning_delta,
+  879:                     on_first_delta=on_first_delta,
+  880:                     on_event=_on_event,
+  881:                     interrupt_check=_interrupt_check,
+  882:                 )
+  883:             except (_httpx.RemoteProtocolError, _httpx.ReadTimeout, _httpx.ConnectError, ConnectionError) as exc:
+  884:                 if attempt < max_stream_retries:
+```
+### agent/lsp/client.py:219
+```python
+  215:         # asyncio.Event sticky-state trap.
+  216:         self._push_counter = 0
+  217:         # Registration change event so wait_for_diagnostics can re-loop
+  218:         # when the server announces a new dynamic provider.
+  219:         self._registration_event = asyncio.Event()
+  220: 
+  221:     @property
+  222:     def is_running(self) -> bool:
+  223:         return self._state == "running" and self._proc is not None and self._proc.returncode is None
+```
+### agent/lsp/client.py:614
+```python
+  610:             method = reg.get("method")
+  611:             reg_id = reg.get("id")
+  612:             if method == "textDocument/diagnostic" and reg_id:
+  613:                 self._diagnostic_registrations[str(reg_id)] = reg
+  614:                 self._registration_event.set()
+  615:         return None
+  616: 
+  617:     async def _handle_unregister_capability(self, params: Any) -> Any:
+  618:         if not isinstance(params, dict):
+```
+### agent/transports/codex_app_server_session.py:209
+```python
+  205:         codex_bin: str = "codex",
+  206:         codex_home: Optional[str] = None,
+  207:         permission_profile: Optional[str] = None,
+  208:         approval_callback: Optional[Callable[..., str]] = None,
+  209:         on_event: Optional[Callable[[dict], None]] = None,
+  210:         request_routing: Optional[_ServerRequestRouting] = None,
+  211:         client_factory: Optional[Callable[..., CodexAppServerClient]] = None,
+  212:     ) -> None:
+  213:         self._cwd = cwd or os.getcwd()
+```
+### agent/transports/codex_app_server_session.py:223
+```python
+  219:                 "workspace-write",
+  220:             )
+  221:         )
+  222:         self._approval_callback = approval_callback
+  223:         self._on_event = on_event  # Display hook (kawaii spinner ticks etc.)
+  224:         self._routing = request_routing or _ServerRequestRouting()
+  225:         self._client_factory = client_factory or CodexAppServerClient
+  226: 
+  227:         self._client: Optional[CodexAppServerClient] = None
+```
+### agent/transports/codex_app_server_session.py:539
+```python
+  535:             if note is None:
+  536:                 continue
+  537: 
+  538:             method = note.get("method", "")
+  539:             if self._on_event is not None:
+  540:                 try:
+  541:                     self._on_event(note)
+  542:                 except Exception:  # pragma: no cover - display callback
+  543:                     logger.debug("on_event callback raised", exc_info=True)
+```
+### agent/transports/codex_app_server_session.py:541
+```python
+  537: 
+  538:             method = note.get("method", "")
+  539:             if self._on_event is not None:
+  540:                 try:
+  541:                     self._on_event(note)
+  542:                 except Exception:  # pragma: no cover - display callback
+  543:                     logger.debug("on_event callback raised", exc_info=True)
+  544: 
+  545:             _apply_token_usage_notification(result, note)
+```
+### agent/transports/codex_app_server_session.py:543
+```python
+  539:             if self._on_event is not None:
+  540:                 try:
+  541:                     self._on_event(note)
+  542:                 except Exception:  # pragma: no cover - display callback
+  543:                     logger.debug("on_event callback raised", exc_info=True)
+  544: 
+  545:             _apply_token_usage_notification(result, note)
+  546:             _apply_compaction_notification(result, note)
+  547: 
+```
+### agent/transports/codex_app_server_session.py:726
+```python
+  722:             if note is None:
+  723:                 continue
+  724: 
+  725:             method = note.get("method", "")
+  726:             if self._on_event is not None:
+  727:                 try:
+  728:                     self._on_event(note)
+  729:                 except Exception:  # pragma: no cover - display callback
+  730:                     logger.debug("on_event callback raised", exc_info=True)
+```
+### agent/transports/codex_app_server_session.py:728
+```python
+  724: 
+  725:             method = note.get("method", "")
+  726:             if self._on_event is not None:
+  727:                 try:
+  728:                     self._on_event(note)
+  729:                 except Exception:  # pragma: no cover - display callback
+  730:                     logger.debug("on_event callback raised", exc_info=True)
+  731: 
+  732:             _apply_token_usage_notification(result, note)
+```
+### agent/transports/codex_app_server_session.py:730
+```python
+  726:             if self._on_event is not None:
+  727:                 try:
+  728:                     self._on_event(note)
+  729:                 except Exception:  # pragma: no cover - display callback
+  730:                     logger.debug("on_event callback raised", exc_info=True)
+  731: 
+  732:             _apply_token_usage_notification(result, note)
+  733:             _apply_compaction_notification(result, note)
+  734:             self._track_pending_file_change(note)
+```
+### agent/verification_evidence.py:84
+```python
+   80:         """
+   81:     )
+   82:     conn.execute(
+   83:         """
+   84:         CREATE TABLE IF NOT EXISTS verification_events (
+   85:             id INTEGER PRIMARY KEY AUTOINCREMENT,
+   86:             created_at TEXT NOT NULL,
+   87:             session_id TEXT NOT NULL,
+   88:             cwd TEXT NOT NULL,
+```
+### agent/verification_evidence.py:114
+```python
+  110:         """
+  111:     )
+  112:     conn.execute(
+  113:         """
+  114:         CREATE INDEX IF NOT EXISTS idx_verification_events_session_root
+  115:         ON verification_events(session_id, root, id DESC)
+  116:         """
+  117:     )
+  118:     conn.execute(
+```
+### agent/verification_evidence.py:115
+```python
+  111:     )
+  112:     conn.execute(
+  113:         """
+  114:         CREATE INDEX IF NOT EXISTS idx_verification_events_session_root
+  115:         ON verification_events(session_id, root, id DESC)
+  116:         """
+  117:     )
+  118:     conn.execute(
+  119:         "INSERT OR REPLACE INTO meta(key, value) VALUES ('schema_version', ?)",
+```
+### agent/verification_evidence.py:326
+```python
+  322:     """Bound ledger growth without deleting the current state pointer."""
+  323:     cutoff = _retention_cutoff()
+  324:     conn.execute(
+  325:         """
+  326:         DELETE FROM verification_events
+  327:         WHERE session_id = ?
+  328:           AND root = ?
+  329:           AND id NOT IN (
+  330:               SELECT id FROM verification_events
+```
+### agent/verification_evidence.py:330
+```python
+  326:         DELETE FROM verification_events
+  327:         WHERE session_id = ?
+  328:           AND root = ?
+  329:           AND id NOT IN (
+  330:               SELECT id FROM verification_events
+  331:               WHERE session_id = ? AND root = ?
+  332:               ORDER BY id DESC
+  333:               LIMIT ?
+  334:           )
+```
+### agent/verification_evidence.py:348
+```python
+  344:         )
+  345:         OR (
+  346:             last_edit_at IS NULL
+  347:             AND last_event_id IN (
+  348:                 SELECT id FROM verification_events
+  349:                 WHERE created_at < ?
+  350:             )
+  351:         )
+  352:         """,
+```
+### agent/verification_evidence.py:357
+```python
+  353:         (cutoff, cutoff),
+  354:     )
+  355:     conn.execute(
+  356:         """
+  357:         DELETE FROM verification_events
+  358:         WHERE created_at < ?
+  359:           AND id NOT IN (
+  360:               SELECT last_event_id FROM verification_state
+  361:               WHERE last_event_id IS NOT NULL
+```
+### agent/verification_evidence.py:368
+```python
+  364:         (cutoff,),
+  365:     )
+  366:     conn.execute(
+  367:         """
+  368:         DELETE FROM verification_events
+  369:         WHERE id NOT IN (
+  370:             SELECT id FROM verification_events
+  371:             ORDER BY id DESC
+  372:             LIMIT ?
+```
+### agent/verification_evidence.py:370
+```python
+  366:     conn.execute(
+  367:         """
+  368:         DELETE FROM verification_events
+  369:         WHERE id NOT IN (
+  370:             SELECT id FROM verification_events
+  371:             ORDER BY id DESC
+  372:             LIMIT ?
+  373:         )
+  374:           AND id NOT IN (
+```
+### agent/verification_evidence.py:455
+```python
+  451:     with _DB_LOCK:
+  452:         with _connect() as conn:
+  453:             cur = conn.execute(
+  454:                 """
+  455:                 INSERT INTO verification_events(
+  456:                     created_at, session_id, cwd, root, command, canonical_command,
+  457:                     kind, scope, status, exit_code, output_summary
+  458:                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  459:                 """,
+```
+### agent/verification_evidence.py:588
+```python
+  584:                 }
+  585:             event = None
+  586:             if state["last_event_id"] is not None:
+  587:                 event = conn.execute(
+  588:                     "SELECT * FROM verification_events WHERE id = ?",
+  589:                     (state["last_event_id"],),
+  590:                 ).fetchone()
+  591: 
+  592:     changed_paths: list[str] = []
+```
+### hermes_cli/kanban_diagnostics.py:172
+```python
+  168:     t = _task_field(ev, "created_at", 0)
+  169:     return int(t or 0)
+  170: 
+  171: 
+  172: def _active_hallucination_events(
+  173:     events: Iterable[Any],
+  174:     kind: str,
+  175: ) -> list[Any]:
+  176:     """Return events of ``kind`` that have no ``completed``/``edited``
+```
+### hermes_cli/kanban_diagnostics.py:334
+```python
+  330: 
+  331:     Auto-clears when a successful completion (or edit) follows the
+  332:     blocked event.
+  333:     """
+  334:     hits = _active_hallucination_events(events, "completion_blocked_hallucination")
+  335:     if not hits:
+  336:         return []
+  337:     phantom_ids: list[str] = []
+  338:     first = _event_ts(hits[0])
+```
+### hermes_cli/kanban_diagnostics.py:491
+```python
+  487: 
+  488:     Auto-clears when a fresh clean completion arrives AFTER the
+  489:     suspected event.
+  490:     """
+  491:     hits = _active_hallucination_events(events, "suspected_hallucinated_references")
+  492:     if not hits:
+  493:         return []
+  494:     phantom_refs: list[str] = []
+  495:     for ev in hits:
+```
+### tools/async_delegation.py:255
+```python
+  251:         # Snapshot fields needed for the event while holding the lock.
+  252:         event_record = dict(record)
+  253:         _prune_completed_locked()
+  254: 
+  255:     _push_completion_event(event_record, result, status)
+  256: 
+  257: 
+  258: def _push_completion_event(
+  259:     record: Dict[str, Any], result: Dict[str, Any], status: str
+```
+### tools/async_delegation.py:258
+```python
+  254: 
+  255:     _push_completion_event(event_record, result, status)
+  256: 
+  257: 
+  258: def _push_completion_event(
+  259:     record: Dict[str, Any], result: Dict[str, Any], status: str
+  260: ) -> None:
+  261:     """Push a type='async_delegation' event onto the shared completion queue.
+  262: 
+```
+### tools/browser_supervisor.py:871
+```python
+  867:                             )
+  868:                         else:
+  869:                             fut.set_result(msg)
+  870:                 elif "method" in msg:
+  871:                     await self._on_event(msg["method"], msg.get("params", {}), msg.get("sessionId"))
+  872:         except Exception as e:
+  873:             logger.debug("CDP read loop exited: %s", e)
+  874: 
+  875:     # ── Event dispatch ──────────────────────────────────────────────────────
+```
+### tools/browser_supervisor.py:877
+```python
+  873:             logger.debug("CDP read loop exited: %s", e)
+  874: 
+  875:     # ── Event dispatch ──────────────────────────────────────────────────────
+  876: 
+  877:     async def _on_event(
+  878:         self, method: str, params: Dict[str, Any], session_id: Optional[str]
+  879:     ) -> None:
+  880:         if method == "Page.javascriptDialogOpening":
+  881:             await self._on_dialog_opening(params, session_id)
+```
+### tools/process_registry.py:136
+```python
+  132:     _watch_last_emit_at: float = field(default=0.0, repr=False)
+  133:     _watch_cooldown_until: float = field(default=0.0, repr=False)
+  134:     _watch_strike_candidate: bool = field(default=False, repr=False)
+  135:     _watch_consecutive_strikes: int = field(default=0, repr=False)
+  136:     _completion_event: threading.Event = field(default_factory=threading.Event, repr=False)
+  137:     _lock: threading.Lock = field(default_factory=threading.Lock)
+  138:     _reader_thread: Optional[threading.Thread] = field(default=None, repr=False)
+  139:     _pty: Any = field(default=None, repr=False)  # ptyprocess handle (when use_pty=True)
+  140: 
+```
+### tools/process_registry.py:1076
+```python
+ 1072:         """
+ 1073:         with self._lock:
+ 1074:             was_running = self._running.pop(session.id, None) is not None
+ 1075:             self._finished[session.id] = session
+ 1076:         session._completion_event.set()
+ 1077:         self._write_checkpoint()
+ 1078: 
+ 1079:         # Only enqueue completion notification on the FIRST move.  Without
+ 1080:         # this guard, kill_process() and the reader thread can both call
+```
+### tools/process_registry.py:1401
+```python
+ 1397: 
+ 1398:             remaining = deadline - time.monotonic()
+ 1399:             if remaining <= 0:
+ 1400:                 break
+ 1401:             session._completion_event.wait(timeout=min(1.0, remaining))
+ 1402: 
+ 1403:         result = {
+ 1404:             "status": "timeout",
+ 1405:             "command": session.command,
+```
 
-## Codex event forwarding sites
+## Matches for `stream_callback`
+### agent/agent_init.py:690
+```python
+  686:         pass
+  687:     
+  688:     # Internal stream callback (set during streaming TTS).
+  689:     # Initialized here so _vprint can reference it before run_conversation.
+  690:     agent._stream_callback = None
+  691:     # Deferred paragraph break flag — set after tool iterations so a
+  692:     # single "\n\n" is prepended to the next real text delta.
+  693:     agent._stream_needs_break = False
+  694:     # Stateful scrubber for <memory-context> spans split across stream
+```
+### agent/chat_completion_helpers.py:971
+```python
+  967:         # When streaming is NOT active, always fire so non-streaming modes
+  968:         # (gateway, batch, quiet) still get reasoning.
+  969:         # Any reasoning that wasn't shown during streaming is caught by the
+  970:         # CLI post-response display fallback (cli.py _reasoning_shown_this_turn).
+  971:         if not agent.stream_delta_callback and not agent._stream_callback:
+  972:             try:
+  973:                 agent.reasoning_callback(reasoning_text)
+  974:             except Exception:
+  975:                 pass
+```
+### agent/chat_completion_helpers.py:1838
+```python
+ 1834:     - chat_completions: stream=True on OpenAI-compatible endpoints
+ 1835:     - anthropic_messages: client.messages.stream() via Anthropic SDK
+ 1836:     - codex_responses: delegates to _run_codex_stream (already streaming)
+ 1837: 
+ 1838:     Fires stream_delta_callback and _stream_callback for each text token.
+ 1839:     Tool-call turns suppress the callback — only text-only final responses
+ 1840:     stream to the consumer.  Returns a SimpleNamespace that mimics the
+ 1841:     non-streaming response shape so the rest of the agent loop is unchanged.
+ 1842: 
+```
+### agent/conversation_loop.py:529
+```python
+  525:     user_message: str,
+  526:     system_message: str = None,
+  527:     conversation_history: List[Dict[str, Any]] = None,
+  528:     task_id: str = None,
+  529:     stream_callback: Optional[callable] = None,
+  530:     persist_user_message: Optional[str] = None,
+  531:     persist_user_timestamp: Optional[float] = None,
+  532:     moa_config: Optional[dict[str, Any]] = None,
+  533: ) -> Dict[str, Any]:
+```
+### agent/conversation_loop.py:542
+```python
+  538:         user_message (str): The user's message/question
+  539:         system_message (str): Custom system message (optional, overrides ephemeral_system_prompt if provided)
+  540:         conversation_history (List[Dict]): Previous conversation messages (optional)
+  541:         task_id (str): Unique identifier for this task to isolate VMs between concurrent tasks (optional, auto-generated if not provided)
+  542:         stream_callback: Optional callback invoked with each text delta during streaming.
+  543:             Used by the TTS pipeline to start audio generation before the full response.
+  544:             When None (default), API calls use the standard non-streaming path.
+  545:         persist_user_message: Optional clean user message to store in
+  546:             transcripts/history when user_message contains API-only
+```
+### agent/conversation_loop.py:582
+```python
+  578:         user_message,
+  579:         system_message,
+  580:         conversation_history,
+  581:         task_id,
+  582:         stream_callback,
+  583:         persist_user_message,
+  584:         persist_user_timestamp,
+  585:         restore_or_build_system_prompt=_restore_or_build_system_prompt,
+  586:         install_safe_stdio=_install_safe_stdio,
+```
+### agent/conversation_loop.py:4680
+```python
+ 4676:                 # Close any open streaming display (response box, reasoning
+ 4677:                 # box) before tool execution begins.  Intermediate turns may
+ 4678:                 # have streamed early content that opened the response box;
+ 4679:                 # flushing here prevents it from wrapping tool feed lines.
+ 4680:                 # Only signal the display callback — TTS (_stream_callback)
+ 4681:                 # should NOT receive None (it uses None as end-of-stream).
+ 4682:                 if agent.stream_delta_callback:
+ 4683:                     try:
+ 4684:                         agent.stream_delta_callback(None)
+```
+### agent/turn_context.py:125
+```python
+  121:     user_message: str,
+  122:     system_message: Optional[str],
+  123:     conversation_history: Optional[List[Dict[str, Any]]],
+  124:     task_id: Optional[str],
+  125:     stream_callback,
+  126:     persist_user_message: Optional[str],
+  127:     persist_user_timestamp: Optional[float] = None,
+  128:     *,
+  129:     restore_or_build_system_prompt,
+```
+### agent/turn_context.py:211
+```python
+  207:     if isinstance(persist_user_message, str):
+  208:         persist_user_message = sanitize_surrogates(persist_user_message)
+  209: 
+  210:     # Store stream callback for _interruptible_api_call to pick up.
+  211:     agent._stream_callback = stream_callback
+  212:     agent._persist_user_message_idx = None
+  213:     agent._persist_user_message_override = persist_user_message
+  214:     agent._persist_user_message_timestamp = persist_user_timestamp
+  215:     # Generate unique task_id if not provided to isolate VMs between tasks.
+```
+### agent/turn_finalizer.py:452
+```python
+  448:     # Clear interrupt state after handling
+  449:     agent.clear_interrupt()
+  450: 
+  451:     # Clear stream callback so it doesn't leak into future calls
+  452:     agent._stream_callback = None
+  453: 
+  454:     # Check skill trigger NOW — based on how many tool iterations THIS turn used.
+  455:     _should_review_skills = False
+  456:     if (agent._skill_nudge_interval > 0
+```
+### run_agent.py:4588
+```python
+ 4584:                 ctx_scrubber = getattr(self, "_stream_context_scrubber", None)
+ 4585:                 if ctx_scrubber is not None:
+ 4586:                     think_tail = ctx_scrubber.feed(think_tail)
+ 4587:                 if think_tail:
+ 4588:                     callbacks = [cb for cb in (self.stream_delta_callback, self._stream_callback) if cb is not None]
+ 4589:                     for cb in callbacks:
+ 4590:                         try:
+ 4591:                             cb(think_tail)
+ 4592:                         except Exception:
+```
+### run_agent.py:4602
+```python
+ 4598:         scrubber = getattr(self, "_stream_context_scrubber", None)
+ 4599:         if scrubber is not None:
+ 4600:             tail = scrubber.flush()
+ 4601:             if tail:
+ 4602:                 callbacks = [cb for cb in (self.stream_delta_callback, self._stream_callback) if cb is not None]
+ 4603:                 for cb in callbacks:
+ 4604:                     try:
+ 4605:                         cb(tail)
+ 4606:                     except Exception:
+```
+### run_agent.py:4692
+```python
+ 4688:             ):
+ 4689:                 text = text.lstrip("\n")
+ 4690:         if not text:
+ 4691:             return
+ 4692:         callbacks = [cb for cb in (self.stream_delta_callback, self._stream_callback) if cb is not None]
+ 4693:         delivered = False
+ 4694:         for cb in callbacks:
+ 4695:             try:
+ 4696:                 cb(text)
+```
+### run_agent.py:4731
+```python
+ 4727:     def _has_stream_consumers(self) -> bool:
+ 4728:         """Return True if any streaming consumer is registered."""
+ 4729:         return (
+ 4730:             self.stream_delta_callback is not None
+ 4731:             or getattr(self, "_stream_callback", None) is not None
+ 4732:         )
+ 4733: 
+ 4734:     def _interruptible_streaming_api_call(
+ 4735:         self, api_kwargs: dict, *, on_first_delta: callable = None
+```
+### run_agent.py:5751
+```python
+ 5747:         user_message: str,
+ 5748:         system_message: str = None,
+ 5749:         conversation_history: List[Dict[str, Any]] = None,
+ 5750:         task_id: str = None,
+ 5751:         stream_callback: Optional[callable] = None,
+ 5752:         persist_user_message: Optional[str] = None,
+ 5753:         persist_user_timestamp: Optional[float] = None,
+ 5754:         moa_config: Optional[dict[str, Any]] = None,
+ 5755:     ) -> Dict[str, Any]:
+```
+### run_agent.py:5764
+```python
+ 5760:             user_message,
+ 5761:             system_message,
+ 5762:             conversation_history,
+ 5763:             task_id,
+ 5764:             stream_callback,
+ 5765:             persist_user_message,
+ 5766:             persist_user_timestamp=persist_user_timestamp,
+ 5767:             moa_config=moa_config,
+ 5768:         )
+```
+### run_agent.py:5770
+```python
+ 5766:             persist_user_timestamp=persist_user_timestamp,
+ 5767:             moa_config=moa_config,
+ 5768:         )
+ 5769: 
+ 5770:     def chat(self, message: str, stream_callback: Optional[callable] = None) -> str:
+ 5771:         """
+ 5772:         Simple chat interface that returns just the final response.
+ 5773: 
+ 5774:         Args:
+```
+### run_agent.py:5776
+```python
+ 5772:         Simple chat interface that returns just the final response.
+ 5773: 
+ 5774:         Args:
+ 5775:             message (str): User message
+ 5776:             stream_callback: Optional callback invoked with each text delta during streaming.
+ 5777: 
+ 5778:         Returns:
+ 5779:             str: Final assistant response
+ 5780:         """
+```
+### run_agent.py:5781
+```python
+ 5777: 
+ 5778:         Returns:
+ 5779:             str: Final assistant response
+ 5780:         """
+ 5781:         result = self.run_conversation(message, stream_callback=stream_callback)
+ 5782:         return result["final_response"]
+ 5783: 
+ 5784:     def _run_codex_app_server_turn(
+ 5785:         self,
+```
+### tools/delegate_tool.py:1924
+```python
+ 1920:             _worker_thread_holder["t"] = threading.current_thread()
+ 1921:             return child.run_conversation(
+ 1922:                 user_message=goal,
+ 1923:                 task_id=child_task_id,
+ 1924:                 stream_callback=_relay_child_text,
+ 1925:             )
+ 1926: 
+ 1927:         _child_future = _timeout_executor.submit(_run_with_thread_capture)
+ 1928:         try:
+```
 
-## Conversation-loop codex special path
+## Matches for `interim_assistant_callback`
+### agent/agent_init.py:299
+```python
+  295:     clarify_callback: callable = None,
+  296:     read_terminal_callback: callable = None,
+  297:     step_callback: callable = None,
+  298:     stream_delta_callback: callable = None,
+  299:     interim_assistant_callback: callable = None,
+  300:     tool_gen_callback: callable = None,
+  301:     status_callback: callable = None,
+  302:     notice_callback: callable = None,
+  303:     notice_clear_callback: callable = None,
+```
+### agent/agent_init.py:533
+```python
+  529:     agent.clarify_callback = clarify_callback
+  530:     agent.read_terminal_callback = read_terminal_callback
+  531:     agent.step_callback = step_callback
+  532:     agent.stream_delta_callback = stream_delta_callback
+  533:     agent.interim_assistant_callback = interim_assistant_callback
+  534:     agent.status_callback = status_callback
+  535:     agent.notice_callback = notice_callback
+  536:     agent.notice_clear_callback = notice_clear_callback
+  537:     agent.event_callback = event_callback
+```
+### run_agent.py:455
+```python
+  451:         clarify_callback: callable = None,
+  452:         read_terminal_callback: callable = None,
+  453:         step_callback: callable = None,
+  454:         stream_delta_callback: callable = None,
+  455:         interim_assistant_callback: callable = None,
+  456:         tool_gen_callback: callable = None,
+  457:         status_callback: callable = None,
+  458:         notice_callback: callable = None,
+  459:         notice_clear_callback: callable = None,
+```
+### run_agent.py:530
+```python
+  526:             clarify_callback=clarify_callback,
+  527:             read_terminal_callback=read_terminal_callback,
+  528:             step_callback=step_callback,
+  529:             stream_delta_callback=stream_delta_callback,
+  530:             interim_assistant_callback=interim_assistant_callback,
+  531:             tool_gen_callback=tool_gen_callback,
+  532:             status_callback=status_callback,
+  533:             notice_callback=notice_callback,
+  534:             notice_clear_callback=notice_clear_callback,
+```
+### run_agent.py:4637
+```python
+ 4633:         return bool(streamed) and streamed == visible_content
+ 4634: 
+ 4635:     def _emit_interim_assistant_message(self, assistant_msg: Dict[str, Any]) -> None:
+ 4636:         """Surface a real mid-turn assistant commentary message to the UI layer."""
+ 4637:         cb = getattr(self, "interim_assistant_callback", None)
+ 4638:         if cb is None or not isinstance(assistant_msg, dict):
+ 4639:             return
+ 4640:         content = assistant_msg.get("content")
+ 4641:         visible = self._strip_think_blocks(content or "").strip()
+```
+### run_agent.py:4648
+```python
+ 4644:         already_streamed = self._interim_content_was_streamed(visible)
+ 4645:         try:
+ 4646:             cb(visible, already_streamed=already_streamed)
+ 4647:         except Exception:
+ 4648:             logger.debug("interim_assistant_callback error", exc_info=True)
+ 4649: 
+ 4650:     def _fire_stream_delta(self, text: str) -> None:
+ 4651:         """Fire all registered stream delta callbacks (display + TTS)."""
+ 4652:         # If a tool iteration set the break flag, prepend a single paragraph
+```
+
+## Matches for `acp_command`
+### agent/agent_init.py:266
+```python
+  262:     base_url: str = None,
+  263:     api_key: str = None,
+  264:     provider: str = None,
+  265:     api_mode: str = None,
+  266:     acp_command: str = None,
+  267:     acp_args: list[str] | None = None,
+  268:     command: str = None,
+  269:     args: list[str] | None = None,
+  270:     model: str = "",
+```
+### agent/agent_init.py:421
+```python
+  417:     # Store effective base URL for feature detection (prompt caching, reasoning, etc.)
+  418:     agent.base_url = base_url or ""
+  419:     provider_name = provider.strip().lower() if isinstance(provider, str) and provider.strip() else None
+  420:     agent.provider = provider_name or ""
+  421:     agent.acp_command = acp_command or command
+  422:     agent.acp_args = list(acp_args or args or [])
+  423:     if api_mode in {"chat_completions", "codex_responses", "anthropic_messages", "bedrock_converse", "codex_app_server"}:
+  424:         agent.api_mode = api_mode
+  425:     elif agent.provider == "openai-codex":
+```
+### agent/agent_init.py:914
+```python
+  910:                 client_kwargs = {"api_key": api_key, "base_url": base_url}
+  911:             if _provider_timeout is not None:
+  912:                 client_kwargs["timeout"] = _provider_timeout
+  913:             if agent.provider == "copilot-acp":
+  914:                 client_kwargs["command"] = agent.acp_command
+  915:                 client_kwargs["args"] = agent.acp_args
+  916:             effective_base = base_url
+  917:             if base_url_host_matches(effective_base, "openrouter.ai"):
+  918:                 from agent.auxiliary_client import build_or_headers
+```
+### agent/copilot_acp_client.py:405
+```python
+  401:         *,
+  402:         api_key: str | None = None,
+  403:         base_url: str | None = None,
+  404:         default_headers: dict[str, str] | None = None,
+  405:         acp_command: str | None = None,
+  406:         acp_args: list[str] | None = None,
+  407:         acp_cwd: str | None = None,
+  408:         command: str | None = None,
+  409:         args: list[str] | None = None,
+```
+### agent/copilot_acp_client.py:415
+```python
+  411:     ):
+  412:         self.api_key = api_key or "copilot-acp"
+  413:         self.base_url = base_url or ACP_MARKER_BASE_URL
+  414:         self._default_headers = dict(default_headers or {})
+  415:         self._acp_command = acp_command or command or _resolve_command()
+  416:         self._acp_args = list(acp_args or args or _resolve_args())
+  417:         self._acp_cwd = str(Path(acp_cwd or os.getcwd()).resolve())
+  418:         self.chat = _ACPChatNamespace(self)
+  419:         self.is_closed = False
+```
+### agent/copilot_acp_client.py:507
+```python
+  503: 
+  504:     def _run_prompt(self, prompt_text: str, *, timeout_seconds: float) -> tuple[str, str]:
+  505:         try:
+  506:             proc = subprocess.Popen(
+  507:                 [self._acp_command] + self._acp_args,
+  508:                 stdin=subprocess.PIPE,
+  509:                 stdout=subprocess.PIPE,
+  510:                 stderr=subprocess.PIPE,
+  511:                 text=True,
+```
+### agent/copilot_acp_client.py:518
+```python
+  514:                 env=_build_subprocess_env(),
+  515:             )
+  516:         except FileNotFoundError as exc:
+  517:             raise RuntimeError(
+  518:                 f"Could not start Copilot ACP command '{self._acp_command}'. "
+  519:                 "Install GitHub Copilot CLI or set HERMES_COPILOT_ACP_COMMAND/COPILOT_CLI_PATH."
+  520:             ) from exc
+  521: 
+  522:         if proc.stdin is None or proc.stdout is None:
+```
+### hermes_cli/cli_agent_setup_mixin.py:82
+```python
+   78:         api_key = runtime.get("api_key")
+   79:         base_url = runtime.get("base_url")
+   80:         resolved_provider = runtime.get("provider", "openrouter")
+   81:         resolved_api_mode = runtime.get("api_mode", self.api_mode)
+   82:         resolved_acp_command = runtime.get("command")
+   83:         resolved_acp_args = list(runtime.get("args") or [])
+   84:         resolved_credential_pool = runtime.get("credential_pool")
+   85:         # A callable api_key is a bearer-token provider (Azure Foundry
+   86:         # Entra ID — ``azure_identity_adapter.build_token_provider``).
+```
+### hermes_cli/cli_agent_setup_mixin.py:118
+```python
+  114:         credentials_changed = api_key != self.api_key or base_url != self.base_url
+  115:         routing_changed = (
+  116:             resolved_provider != self.provider
+  117:             or resolved_api_mode != self.api_mode
+  118:             or resolved_acp_command != self.acp_command
+  119:             or resolved_acp_args != self.acp_args
+  120:         )
+  121:         self.provider = resolved_provider
+  122:         self.api_mode = resolved_api_mode
+```
+### hermes_cli/cli_agent_setup_mixin.py:123
+```python
+  119:             or resolved_acp_args != self.acp_args
+  120:         )
+  121:         self.provider = resolved_provider
+  122:         self.api_mode = resolved_api_mode
+  123:         self.acp_command = resolved_acp_command
+  124:         self.acp_args = resolved_acp_args
+  125:         self._credential_pool = resolved_credential_pool
+  126:         self._provider_source = runtime.get("source")
+  127:         self.api_key = api_key
+```
+### hermes_cli/cli_agent_setup_mixin.py:189
+```python
+  185:             "api_key": self.api_key,
+  186:             "base_url": self.base_url,
+  187:             "provider": self.provider,
+  188:             "api_mode": self.api_mode,
+  189:             "command": self.acp_command,
+  190:             "args": list(self.acp_args or []),
+  191:             "credential_pool": getattr(self, "_credential_pool", None),
+  192:         }
+  193:         route = {
+```
+### hermes_cli/cli_agent_setup_mixin.py:338
+```python
+  334:                 "api_key": self.api_key,
+  335:                 "base_url": self.base_url,
+  336:                 "provider": self.provider,
+  337:                 "api_mode": self.api_mode,
+  338:                 "command": self.acp_command,
+  339:                 "args": list(self.acp_args or []),
+  340:                 "credential_pool": getattr(self, "_credential_pool", None),
+  341:             }
+  342:             effective_model = model_override or self.model
+```
+### hermes_cli/cli_agent_setup_mixin.py:349
+```python
+  345:                 api_key=runtime.get("api_key"),
+  346:                 base_url=runtime.get("base_url"),
+  347:                 provider=runtime.get("provider"),
+  348:                 api_mode=runtime.get("api_mode"),
+  349:                 acp_command=runtime.get("command"),
+  350:                 acp_args=runtime.get("args"),
+  351:                 credential_pool=runtime.get("credential_pool"),
+  352:                 max_tokens=self.max_tokens,
+  353:                 max_iterations=self.max_turns,
+```
+### hermes_cli/cli_commands_mixin.py:1642
+```python
+ 1638:                     api_key=turn_route["runtime"].get("api_key"),
+ 1639:                     base_url=turn_route["runtime"].get("base_url"),
+ 1640:                     provider=turn_route["runtime"].get("provider"),
+ 1641:                     api_mode=turn_route["runtime"].get("api_mode"),
+ 1642:                     acp_command=turn_route["runtime"].get("command"),
+ 1643:                     acp_args=turn_route["runtime"].get("args"),
+ 1644:                     max_tokens=turn_route["runtime"].get("max_tokens"),
+ 1645:                     max_iterations=self.max_turns,
+ 1646:                     enabled_toolsets=self.enabled_toolsets,
+```
+### hermes_cli/tips.py:291
+```python
+  287:     "write_file and patch detect if a file was externally modified since the last read and warn about staleness.",
+  288:     "V4A patch format supports Add File, Delete File, and Move File directives — not just Update.",
+  289:     "MCP servers can request LLM completions back via sampling — the agent becomes a tool for the server.",
+  290:     "MCP servers send notifications/tools/list_changed to trigger automatic tool re-registration without restart.",
+  291:     "delegate_task with acp_command: 'claude' spawns Claude Code as a child agent from any platform.",
+  292:     "Delegation has a heartbeat thread — child activity propagates to the parent, preventing gateway timeouts.",
+  293:     "When a provider returns HTTP 402 (payment required), the auxiliary client auto-falls back to the next one.",
+  294:     "agent.tool_use_enforcement steers models that describe actions instead of calling tools — auto for GPT/Codex.",
+  295:     "agent.restart_drain_timeout (default 60s) lets running agents finish before a gateway restart takes effect.",
+```
+### run_agent.py:422
+```python
+  418:         base_url: str = None,
+  419:         api_key: str = None,
+  420:         provider: str = None,
+  421:         api_mode: str = None,
+  422:         acp_command: str = None,
+  423:         acp_args: list[str] | None = None,
+  424:         command: str = None,
+  425:         args: list[str] | None = None,
+  426:         model: str = "",
+```
+### run_agent.py:497
+```python
+  493:             base_url=base_url,
+  494:             api_key=api_key,
+  495:             provider=provider,
+  496:             api_mode=api_mode,
+  497:             acp_command=acp_command,
+  498:             acp_args=acp_args,
+  499:             command=command,
+  500:             args=args,
+  501:             model=model,
+```
+### tools/delegate_tool.py:1059
+```python
+ 1055:     override_base_url: Optional[str] = None,
+ 1056:     override_api_key: Optional[str] = None,
+ 1057:     override_api_mode: Optional[str] = None,
+ 1058:     # ACP transport overrides from trusted delegation config.
+ 1059:     override_acp_command: Optional[str] = None,
+ 1060:     override_acp_args: Optional[List[str]] = None,
+ 1061:     # Per-call role controlling whether the child can further delegate.
+ 1062:     # 'leaf' (default) cannot; 'orchestrator' retains the delegation
+ 1063:     # toolset subject to depth/kill-switch bounds applied below.
+```
+### tools/delegate_tool.py:1218
+```python
+ 1214:         effective_api_mode = getattr(parent_agent, "api_mode", None)
+ 1215:     # Defensive: validate trusted delegation.command exists on PATH before
+ 1216:     # honoring it. Stale config should not force a child onto the ACP transport
+ 1217:     # and then fail at subprocess startup.
+ 1218:     if override_acp_command:
+ 1219:         import shutil as _shutil
+ 1220: 
+ 1221:         if not _shutil.which(override_acp_command):
+ 1222:             logger.warning(
+```
+### tools/delegate_tool.py:1221
+```python
+ 1217:     # and then fail at subprocess startup.
+ 1218:     if override_acp_command:
+ 1219:         import shutil as _shutil
+ 1220: 
+ 1221:         if not _shutil.which(override_acp_command):
+ 1222:             logger.warning(
+ 1223:                 "Ignoring acp_command=%r: binary not found on PATH; "
+ 1224:                 "falling back to default transport.",
+ 1225:                 override_acp_command,
+```
+### tools/delegate_tool.py:1223
+```python
+ 1219:         import shutil as _shutil
+ 1220: 
+ 1221:         if not _shutil.which(override_acp_command):
+ 1222:             logger.warning(
+ 1223:                 "Ignoring acp_command=%r: binary not found on PATH; "
+ 1224:                 "falling back to default transport.",
+ 1225:                 override_acp_command,
+ 1226:             )
+ 1227:             override_acp_command = None
+```
+### tools/delegate_tool.py:1225
+```python
+ 1221:         if not _shutil.which(override_acp_command):
+ 1222:             logger.warning(
+ 1223:                 "Ignoring acp_command=%r: binary not found on PATH; "
+ 1224:                 "falling back to default transport.",
+ 1225:                 override_acp_command,
+ 1226:             )
+ 1227:             override_acp_command = None
+ 1228:             override_acp_args = None
+ 1229:     effective_acp_command = override_acp_command or getattr(
+```
+### tools/delegate_tool.py:1227
+```python
+ 1223:                 "Ignoring acp_command=%r: binary not found on PATH; "
+ 1224:                 "falling back to default transport.",
+ 1225:                 override_acp_command,
+ 1226:             )
+ 1227:             override_acp_command = None
+ 1228:             override_acp_args = None
+ 1229:     effective_acp_command = override_acp_command or getattr(
+ 1230:         parent_agent, "acp_command", None
+ 1231:     )
+```
+### tools/delegate_tool.py:1229
+```python
+ 1225:                 override_acp_command,
+ 1226:             )
+ 1227:             override_acp_command = None
+ 1228:             override_acp_args = None
+ 1229:     effective_acp_command = override_acp_command or getattr(
+ 1230:         parent_agent, "acp_command", None
+ 1231:     )
+ 1232:     effective_acp_args = list(
+ 1233:         override_acp_args
+```
+### tools/delegate_tool.py:1230
+```python
+ 1226:             )
+ 1227:             override_acp_command = None
+ 1228:             override_acp_args = None
+ 1229:     effective_acp_command = override_acp_command or getattr(
+ 1230:         parent_agent, "acp_command", None
+ 1231:     )
+ 1232:     effective_acp_args = list(
+ 1233:         override_acp_args
+ 1234:         if override_acp_args is not None
+```
+### tools/delegate_tool.py:1240
+```python
+ 1236:     )
+ 1237: 
+ 1238:     # When override_provider is set (e.g. delegation.provider: minimax-cn),
+ 1239:     # the subagent must use direct API calls — not the parent's ACP transport.
+ 1240:     # Inheriting acp_command unconditionally causes run_agent.py to initialize
+ 1241:     # CopilotACPClient, bypassing override credentials entirely (issue #16816).
+ 1242:     if override_provider and not override_acp_command:
+ 1243:         effective_acp_command = None
+ 1244:         effective_acp_args = []
+```
+### tools/delegate_tool.py:1242
+```python
+ 1238:     # When override_provider is set (e.g. delegation.provider: minimax-cn),
+ 1239:     # the subagent must use direct API calls — not the parent's ACP transport.
+ 1240:     # Inheriting acp_command unconditionally causes run_agent.py to initialize
+ 1241:     # CopilotACPClient, bypassing override credentials entirely (issue #16816).
+ 1242:     if override_provider and not override_acp_command:
+ 1243:         effective_acp_command = None
+ 1244:         effective_acp_args = []
+ 1245: 
+ 1246:     if override_acp_command:
+```
+### tools/delegate_tool.py:1243
+```python
+ 1239:     # the subagent must use direct API calls — not the parent's ACP transport.
+ 1240:     # Inheriting acp_command unconditionally causes run_agent.py to initialize
+ 1241:     # CopilotACPClient, bypassing override credentials entirely (issue #16816).
+ 1242:     if override_provider and not override_acp_command:
+ 1243:         effective_acp_command = None
+ 1244:         effective_acp_args = []
+ 1245: 
+ 1246:     if override_acp_command:
+ 1247:         # If explicitly forcing an ACP transport override, the provider MUST be copilot-acp
+```
+### tools/delegate_tool.py:1246
+```python
+ 1242:     if override_provider and not override_acp_command:
+ 1243:         effective_acp_command = None
+ 1244:         effective_acp_args = []
+ 1245: 
+ 1246:     if override_acp_command:
+ 1247:         # If explicitly forcing an ACP transport override, the provider MUST be copilot-acp
+ 1248:         # so run_agent.py initializes the CopilotACPClient.
+ 1249:         effective_provider = "copilot-acp"
+ 1250:         effective_api_mode = "chat_completions"
+```
+### tools/delegate_tool.py:1307
+```python
+ 1303:         api_key=effective_api_key,
+ 1304:         model=effective_model,
+ 1305:         provider=effective_provider,
+ 1306:         api_mode=effective_api_mode,
+ 1307:         acp_command=effective_acp_command,
+ 1308:         acp_args=effective_acp_args,
+ 1309:         max_iterations=max_iterations,
+ 1310:         max_tokens=getattr(parent_agent, "max_tokens", None),
+ 1311:         reasoning_config=child_reasoning,
+```
+### tools/delegate_tool.py:2503
+```python
+ 2499:                 override_provider=creds["provider"],
+ 2500:                 override_base_url=creds["base_url"],
+ 2501:                 override_api_key=creds["api_key"],
+ 2502:                 override_api_mode=creds["api_mode"],
+ 2503:                 override_acp_command=creds.get("command"),
+ 2504:                 override_acp_args=creds.get("args"),
+ 2505:                 role=effective_role,
+ 2506:             )
+ 2507:             # Override with correct parent tool names (before child construction mutated global)
+```
+### tools/delegate_tool.py:3441
+```python
+ 3437:     is_subagent = getattr(parent_agent, "_delegate_depth", 0) > 0
+ 3438:     return not is_subagent
+ 3439: 
+ 3440: 
+ 3441: _MODEL_HIDDEN_TASK_FIELDS = {"acp_command", "acp_args"}
+ 3442: 
+ 3443: 
+ 3444: def _strip_model_hidden_task_fields(tasks: Any) -> Any:
+ 3445:     if not isinstance(tasks, list):
+```
+
+## Matches for `commandExecution`
+### agent/codex_runtime.py:46
+```python
+   42:     if not isinstance(item, dict):
+   43:         return None
+   44: 
+   45:     item_type = item.get("type") or ""
+   46:     if item_type == "commandExecution":
+   47:         command = item.get("command") or ""
+   48:         return "exec_command", command, {"command": command, "cwd": item.get("cwd") or ""}
+   49: 
+   50:     if item_type == "fileChange":
+```
+### agent/transports/codex_app_server_session.py:808
+```python
+  804:         """Translate a codex server request (approval) into Hermes' approval
+  805:         flow, then send the response.
+  806: 
+  807:         Method names verified live against codex 0.130.0 (Apr 2026):
+  808:           item/commandExecution/requestApproval — exec approvals
+  809:           item/fileChange/requestApproval       — apply_patch approvals
+  810:           item/permissions/requestApproval      — permissions changes
+  811:                                                   (we decline; user controls
+  812:                                                   permission profile in
+```
+### agent/transports/codex_app_server_session.py:821
+```python
+  817:         method = req.get("method", "")
+  818:         rid = req.get("id")
+  819:         params = req.get("params") or {}
+  820: 
+  821:         if method == "item/commandExecution/requestApproval":
+  822:             decision = self._decide_exec_approval(params)
+  823:             self._client.respond(rid, {"decision": decision})
+  824:         elif method == "item/fileChange/requestApproval":
+  825:             decision = self._decide_apply_patch_approval(params)
+```
+### agent/transports/codex_event_projector.py:12
+```python
+    8: Codex emits items with a discriminator field `type`:
+    9:   - userMessage         → {role: "user", content}
+   10:   - agentMessage        → {role: "assistant", content}
+   11:   - reasoning           → stashed in the assistant's "reasoning" field
+   12:   - commandExecution    → assistant tool_call(name="exec") + tool result
+   13:   - fileChange          → assistant tool_call(name="apply_patch") + tool result
+   14:   - mcpToolCall         → assistant tool_call(name=f"mcp.{server}.{tool}") + tool result
+   15:   - dynamicToolCall     → assistant tool_call(name=tool) + tool result
+   16:   - plan/hookPrompt/collabAgentToolCall → recorded as opaque assistant notes
+```
+### agent/transports/codex_event_projector.py:101
+```python
+   97:         if item_type == "reasoning":
+   98:             self._pending_reasoning.extend(item.get("summary") or [])
+   99:             self._pending_reasoning.extend(item.get("content") or [])
+  100:             return ProjectionResult()
+  101:         if item_type == "commandExecution":
+  102:             return self._project_command(item, item_id)
+  103:         if item_type == "fileChange":
+  104:             return self._project_file_change(item, item_id)
+  105:         if item_type == "mcpToolCall":
+```
+
+## Matches for `agentMessage`
+### agent/transports/codex_app_server_session.py:89
+```python
+   85:     should_retire: bool = False
+   86: 
+   87: 
+   88: # Markers we accept as terminal even when codex never emits turn/completed.
+   89: # Some codex versions stream `<turn_aborted>` as raw text in agentMessage
+   90: # items when an interrupt or upstream error tears the turn down before the
+   91: # normal completion path fires. Mirrors openclaw beta.8 fix.
+   92: _TURN_ABORTED_MARKERS = ("<turn_aborted>", "<turn_aborted/>")
+   93: 
+```
+### agent/transports/codex_app_server_session.py:570
+```python
+  566:                 # output — clear the quiet timer so we don't fast-fail.
+  567:                 if projection.messages or projection.final_text is not None:
+  568:                     last_tool_completion_at = None
+  569:             if projection.final_text is not None:
+  570:                 # Codex can emit multiple agentMessage items in one turn
+  571:                 # (e.g. partial then final). Take the last one as canonical.
+  572:                 result.final_text = projection.final_text
+  573:                 # Some codex builds tear a turn down by emitting a
+  574:                 # `<turn_aborted>` marker in the agent message text and
+```
+### agent/transports/codex_app_server_session.py:1052
+```python
+ 1048:     """Return True if `text` contains any of the raw markers codex uses
+ 1049:     to signal a turn was aborted without emitting `turn/completed`.
+ 1050: 
+ 1051:     Codex emits `<turn_aborted>` (and sometimes `<turn_aborted/>`) as raw
+ 1052:     text inside agentMessage items when an interrupt or upstream error
+ 1053:     tears the turn down before the normal completion path fires. Mirrors
+ 1054:     openclaw beta.8's terminal-marker fix so we don't burn the full turn
+ 1055:     deadline waiting for a turn/completed that never comes.
+ 1056:     """
+```
+### agent/transports/codex_event_projector.py:10
+```python
+    6: `agent/curator.py` already knows how to read.
+    7: 
+    8: Codex emits items with a discriminator field `type`:
+    9:   - userMessage         → {role: "user", content}
+   10:   - agentMessage        → {role: "assistant", content}
+   11:   - reasoning           → stashed in the assistant's "reasoning" field
+   12:   - commandExecution    → assistant tool_call(name="exec") + tool result
+   13:   - fileChange          → assistant tool_call(name="apply_patch") + tool result
+   14:   - mcpToolCall         → assistant tool_call(name=f"mcp.{server}.{tool}") + tool result
+```
+### agent/transports/codex_event_projector.py:66
+```python
+   62:     `item/completed` event)."""
+   63: 
+   64:     messages: list[dict] = field(default_factory=list)
+   65:     is_tool_iteration: bool = False
+   66:     final_text: Optional[str] = None  # Set when an agentMessage completes
+   67: 
+   68: 
+   69: class CodexEventProjector:
+   70:     """Stateful projector consuming Codex notifications in arrival order.
+```
+### agent/transports/codex_event_projector.py:95
+```python
+   91:         item = params.get("item") or {}
+   92:         item_type = item.get("type") or ""
+   93:         item_id = item.get("id") or ""
+   94: 
+   95:         if item_type == "agentMessage":
+   96:             return self._project_agent_message(item)
+   97:         if item_type == "reasoning":
+   98:             self._pending_reasoning.extend(item.get("summary") or [])
+   99:             self._pending_reasoning.extend(item.get("content") or [])
+```
