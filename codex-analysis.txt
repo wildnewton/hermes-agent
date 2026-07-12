@@ -1,0 +1,11 @@
+# Codex app-server / delegation inspection
+
+## All relevant matches
+
+## Delegate config and child construction
+
+## Codex app-server construction sites
+
+## Codex event forwarding sites
+
+## Conversation-loop codex special path
