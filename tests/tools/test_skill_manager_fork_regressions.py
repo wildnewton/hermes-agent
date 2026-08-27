@@ -51,3 +51,20 @@ def test_create_rejects_existing_target_when_discovery_misses(tmp_path):
 
     assert result["success"] is False
     assert "already exists" in result["error"]
+
+
+def test_create_still_creates_new_skill(tmp_path):
+    """The collision guard must not block ordinary skill creation."""
+    from tools.skill_manager_tool import _create_skill
+
+    skill_dir = tmp_path / "test-skill"
+
+    with patch("tools.skill_manager_tool.SKILLS_DIR", tmp_path), patch(
+        "agent.skill_utils.get_all_skills_dirs", return_value=[]
+    ), patch("tools.skill_manager_tool._security_scan_skill", return_value=None), patch(
+        "tools.skill_manager_tool._attach_lint_findings"
+    ):
+        result = _create_skill("test-skill", VALID_SKILL_CONTENT)
+
+    assert result["success"] is True
+    assert (skill_dir / "SKILL.md").read_text(encoding="utf-8") == VALID_SKILL_CONTENT
