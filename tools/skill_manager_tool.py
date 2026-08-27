@@ -684,11 +684,15 @@ def _find_skill(name: str) -> Optional[Dict[str, Any]]:
     external dirs configured via skills.external_dirs.  Returns
     {"path": Path} or None.
     """
-    from agent.skill_utils import get_all_skills_dirs, is_excluded_skill_path
+    from agent.skill_utils import (
+        get_all_skills_dirs,
+        is_excluded_skill_path,
+        iter_skill_index_files,
+    )
     for skills_dir in get_all_skills_dirs():
         if not skills_dir.exists():
             continue
-        for skill_md in skills_dir.rglob("SKILL.md"):
+        for skill_md in iter_skill_index_files(skills_dir, "SKILL.md"):
             if is_excluded_skill_path(skill_md):
                 continue
             if skill_md.parent.name == name:
@@ -969,6 +973,18 @@ def _create_skill(name: str, content: str, category: str = None) -> Dict[str, An
 
     # Create the skill directory
     skill_dir = _resolve_skill_dir(name, category)
+
+    # Defense in depth: even if discovery misses an existing target (for
+    # example through an unexpected filesystem layout), never overwrite it.
+    if (skill_dir / "SKILL.md").exists():
+        return {
+            "success": False,
+            "error": (
+                f"Skill '{name}' already exists. "
+                f"Use action='patch' to modify it."
+            ),
+        }
+
     skill_dir.mkdir(parents=True, exist_ok=True)
 
     # Write instructional documents with a readable mode while preserving
